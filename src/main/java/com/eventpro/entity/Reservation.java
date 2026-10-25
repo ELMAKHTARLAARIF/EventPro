@@ -1,0 +1,55 @@
+package com.eventpro.entity;
+
+import com.eventpro.enums.*;
+import jakarta.persistence.*;
+import lombok.*;
+import java.math.BigDecimal;
+import java.time.*;
+import java.util.*;
+
+@Entity
+@Table(name = "reservations")
+@Getter @Setter @NoArgsConstructor
+public class Reservation {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, unique = true)
+    private String reference;
+
+    private LocalDateTime dateCreation = LocalDateTime.now();
+
+    // e.g. dateCreation + 15 minutes
+    private LocalDateTime dateExpiration;
+
+    @Enumerated(EnumType.STRING)
+    private StatutReservation statut = StatutReservation.EN_ATTENTE;
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal montantTotal = BigDecimal.ZERO;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "client_id")
+    private Client client;
+
+    // optional: a reservation may have no promo
+
+    @OneToMany(mappedBy = "reservation", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<LigneReservation> lignes = new ArrayList<>();
+
+    @OneToOne(mappedBy = "reservation")
+    private Paiement paiement;
+
+    public void addLigne(LigneReservation l) {
+        lignes.add(l);
+        l.setReservation(this);
+    }
+
+    public BigDecimal calculerTotal() {
+        return lignes.stream()
+                .map(LigneReservation::getSousTotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+}
