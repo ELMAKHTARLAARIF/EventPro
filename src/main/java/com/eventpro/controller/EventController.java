@@ -34,15 +34,6 @@ public class EventController {
         return ResponseEntity.ok(eventService.search(statut, q, pageable));
     }
 
-    @GetMapping("/evenements/a-venir")
-    public ResponseEntity<List<EventResponseDTO>> aVenir() {
-        return ResponseEntity.ok(eventService.findAVenir());
-    }
-
-    @GetMapping("/evenements/en-vente")
-    public ResponseEntity<List<EventResponseDTO>> enVente() {
-        return ResponseEntity.ok(eventService.findEnVente());
-    }
 
     @GetMapping("/evenements/{id}")
     public ResponseEntity<EventResponseDTO> findById(@PathVariable Long id) {
@@ -75,5 +66,15 @@ public class EventController {
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         eventService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/evenements/a-venir")
+    public ResponseEntity<List<EventResponseDTO>> aVenir() {
+        return ResponseEntity.ok(eventService.findAVenir());
+    }
+
+    @GetMapping("/evenements/en-vente")
+    public ResponseEntity<List<EventResponseDTO>> enVente() {
+        return ResponseEntity.ok(eventService.findEnVente());
     }
 }

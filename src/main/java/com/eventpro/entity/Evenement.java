@@ -49,6 +49,9 @@ public class Evenement {
     @OneToMany(mappedBy = "evenement")
     private List<Promotion> promotions = new ArrayList<>();
 
+    @OneToMany(mappedBy = "evenement")
+    private List<Reservation> reservations = new ArrayList<>();
+
     public void addCategorie(CategorieBillet c) {
         categories.add(c);
         c.setEvenement(this);

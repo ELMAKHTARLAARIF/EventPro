@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -53,5 +54,10 @@ public class Promotion {
     public boolean estUtilisable() {
         LocalDate today = LocalDate.now();
         return !today.isBefore(dateDebut) && !today.isAfter(dateFin) && nombreUtilisations < limiteUtilisation;
+    }
+
+    public BigDecimal calculerReduction(BigDecimal sousTotal) {
+        BigDecimal remise = (typeReduction == TypeReduction.POURCENTAGE) ? sousTotal.multiply(valeurReduction).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP) : valeurReduction;
+        return remise.min(sousTotal);
     }
 }

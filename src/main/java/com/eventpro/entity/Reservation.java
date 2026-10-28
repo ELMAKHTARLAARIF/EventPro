@@ -21,7 +21,7 @@ public class Reservation {
 
     private LocalDateTime dateCreation = LocalDateTime.now();
 
-    // e.g. dateCreation + 15 minutes
+    // dateCreation + 10 minutes (cahier des charges)
     private LocalDateTime dateExpiration;
 
     @Enumerated(EnumType.STRING)
@@ -34,7 +34,14 @@ public class Reservation {
     @JoinColumn(name = "client_id")
     private Client client;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "evenement_id")
+    private Evenement evenement;
+
     // optional: a reservation may have no promo
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "promotion_id")
+    private Promotion promotion;
 
     @OneToMany(mappedBy = "reservation", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<LigneReservation> lignes = new ArrayList<>();

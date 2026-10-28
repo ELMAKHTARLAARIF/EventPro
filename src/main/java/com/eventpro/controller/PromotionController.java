@@ -20,14 +20,12 @@ public class PromotionController {
     public PromotionController(PromotionService promotionService) {
         this.promotionService = promotionService;
     }
-
-    // ---------- events with promotions ----------
+    
     @GetMapping("/evenements/avec-promotions")
     public ResponseEntity<List<EvenementAvecPromotionsDTO>> evenementsAvecPromotions() {
         return ResponseEntity.ok(promotionService.findEvenementsAvecPromotions());
     }
 
-    // ---------- promotions of one event ----------
     @PostMapping("/evenements/{evenementId}/promotions")
     public ResponseEntity<PromotionResponseDTO> create(@PathVariable Long evenementId, @Valid @RequestBody PromotionRequestDTO dto) {
 

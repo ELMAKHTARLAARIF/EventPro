@@ -7,6 +7,7 @@ import com.eventpro.dto.PromotionUpdateDTO;
 import com.eventpro.entity.Evenement;
 import com.eventpro.entity.Promotion;
 import com.eventpro.enums.StatutEvenement;
+import com.eventpro.mapper.PromotionMapper;
 import com.eventpro.repository.EvenementRepository;
 import com.eventpro.repository.PromotionRepository;
 import org.springframework.http.HttpStatus;
@@ -22,10 +23,12 @@ public class PromotionService {
 
     private final PromotionRepository promotionRepository;
     private final EvenementRepository evenementRepository;
+    private final PromotionMapper promotionMapper;
 
-    public PromotionService(PromotionRepository promotionRepository, EvenementRepository evenementRepository) {
+    public PromotionService(PromotionRepository promotionRepository, EvenementRepository evenementRepository, PromotionMapper promotionMapper) {
         this.promotionRepository = promotionRepository;
         this.evenementRepository = evenementRepository;
+        this.promotionMapper = promotionMapper;
     }
 
     // ---------- CREATE ----------
@@ -46,36 +49,29 @@ public class PromotionService {
 
         checkFinDansEvenement(dto.dateFin(), evenement);
 
-        Promotion promotion = new Promotion();
-        promotion.setCode(code);
-        promotion.setTypeReduction(dto.typeReduction());
-        promotion.setValeurReduction(dto.valeurReduction());
-        promotion.setDateDebut(dto.dateDebut());
-        promotion.setDateFin(dto.dateFin());
-        promotion.setLimiteUtilisation(dto.limiteUtilisation());
-        promotion.setNombreUtilisations(0);
-        promotion.setEvenement(evenement);
+        Promotion promotion = promotionMapper.toEntity(dto);   // DTO -> entity
+        promotion.setEvenement(evenement);                     // relations: set here
         promotion.setOrganisateur(evenement.getOrganisateur());
 
-        return toResponse(promotionRepository.save(promotion));
+        return promotionMapper.toResponse(promotionRepository.save(promotion));
     }
 
     // ---------- READ ----------
     @Transactional(readOnly = true)
     public List<PromotionResponseDTO> findByEvenement(Long evenementId) {
         findEvenement(evenementId);
-        return promotionRepository.findByEvenementId(evenementId).stream().map(this::toResponse).toList();
+        return promotionMapper.toResponseList(promotionRepository.findByEvenementId(evenementId));
     }
 
     @Transactional(readOnly = true)
     public PromotionResponseDTO findOne(Long evenementId, Long promotionId) {
-        return toResponse(findPromotion(evenementId, promotionId));
+        return promotionMapper.toResponse(findPromotion(evenementId, promotionId));
     }
 
     @Transactional(readOnly = true)
     public List<PromotionResponseDTO> findActives(Long evenementId) {
         findEvenement(evenementId);
-        return promotionRepository.findActives(evenementId, LocalDate.now()).stream().map(this::toResponse).toList();
+        return promotionMapper.toResponseList(promotionRepository.findActives(evenementId, LocalDate.now()));
     }
 
     @Transactional(readOnly = true)
@@ -85,17 +81,17 @@ public class PromotionService {
         if (!promotion.estUtilisable()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Ce code promo n'est plus valide (expire ou limite atteinte)");
         }
-        return toResponse(promotion);
+        return promotionMapper.toResponse(promotion);
     }
 
     @Transactional(readOnly = true)
     public List<PromotionResponseDTO> findByOrganisateur(Long organisateurId) {
-        return promotionRepository.findByOrganisateurId(organisateurId).stream().map(this::toResponse).toList();
+        return promotionMapper.toResponseList(promotionRepository.findByOrganisateurId(organisateurId));
     }
 
     @Transactional(readOnly = true)
     public List<EvenementAvecPromotionsDTO> findEvenementsAvecPromotions() {
-        return evenementRepository.findAllWithPromotions().stream().map(e -> new EvenementAvecPromotionsDTO(e.getId(), e.getTitre(), e.getLieu(), e.getDateDebut(), e.getDateFin(), e.getStatut(), e.getPromotions().stream().map(this::toResponse).toList())).toList();
+        return promotionMapper.toEvenementAvecPromotionsList(evenementRepository.findAllWithPromotions());
     }
 
     // ---------- UPDATE ----------
@@ -123,15 +119,11 @@ public class PromotionService {
 
         checkFinDansEvenement(dto.dateFin(), promotion.getEvenement());
 
-        promotion.setCode(code);
-        promotion.setTypeReduction(dto.typeReduction());
-        promotion.setValeurReduction(dto.valeurReduction());
-        promotion.setDateDebut(dto.dateDebut());
-        promotion.setDateFin(dto.dateFin());
-        promotion.setLimiteUtilisation(dto.limiteUtilisation());
+        // all checks passed: now copy the new values into the managed entity
+        promotionMapper.updateEntity(dto, promotion);
 
         // no save() needed: the entity is managed, Hibernate flushes the changes
-        return toResponse(promotion);
+        return promotionMapper.toResponse(promotion);
     }
 
     // ---------- DELETE ----------
@@ -160,9 +152,5 @@ public class PromotionService {
         if (evenement.getDateFin() != null && dateFinPromo.isAfter(evenement.getDateFin().toLocalDate())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La promotion ne peut pas se terminer apres la fin de l'evenement");
         }
-    }
-
-    private PromotionResponseDTO toResponse(Promotion p) {
-        return new PromotionResponseDTO(p.getId(), p.getCode(), p.getTypeReduction(), p.getValeurReduction(), p.getDateDebut(), p.getDateFin(), p.getLimiteUtilisation(), p.getNombreUtilisations(), p.getEvenement().getId());
     }
 }

@@ -6,6 +6,7 @@ import com.eventpro.entity.CategorieBillet;
 import com.eventpro.entity.Evenement;
 import com.eventpro.entity.Organisateur;
 import com.eventpro.enums.StatutEvenement;
+import com.eventpro.mapper.EventMapper;
 import com.eventpro.repository.EvenementRepository;
 import com.eventpro.repository.OrganisateurRepository;
 import com.eventpro.repository.PromotionRepository;
@@ -25,14 +26,16 @@ public class EventService {
     private final EvenementRepository evenementRepository;
     private final OrganisateurRepository organisateurRepository;
     private final PromotionRepository promotionRepository;
+    private final EventMapper eventMapper;
 
-    public EventService(EvenementRepository evenementRepository, OrganisateurRepository organisateurRepository, PromotionRepository promotionRepository) {
+    public EventService(EvenementRepository evenementRepository, OrganisateurRepository organisateurRepository, PromotionRepository promotionRepository, EventMapper eventMapper) {
         this.evenementRepository = evenementRepository;
         this.organisateurRepository = organisateurRepository;
         this.promotionRepository = promotionRepository;
+        this.eventMapper = eventMapper;
     }
 
-    // ---------- CREATE ----------
+
     @Transactional
     public EventResponseDTO create(EventRequestDTO dto) {
 
@@ -42,7 +45,7 @@ public class EventService {
 
         Organisateur organisateur = organisateurRepository.findById(dto.organisateurId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Organisateur introuvable : " + dto.organisateurId()));
 
-        if (!dto.dateDebut().isAfter(LocalDateTime.now())) {
+        if (dto.dateDebut().isBefore(LocalDateTime.now())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La date de debut doit etre dans le futur");
         }
 
@@ -50,24 +53,23 @@ public class EventService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Vous avez deja un evenement avec ce titre a cette date");
         }
 
-        Evenement evenement = new Evenement();
-        apply(evenement, dto);
-        evenement.setOrganisateur(organisateur);
-        evenement.setStatut(StatutEvenement.BROUILLON);
+        Evenement evenement = eventMapper.toEntity(dto);   // DTO -> entity
+        nettoyer(evenement);
+        evenement.setOrganisateur(organisateur);           // needs a DB lookup: done here
+        evenement.setStatut(StatutEvenement.BROUILLON);    // business rule: done here
 
-        return toResponse(evenementRepository.save(evenement));
+        return eventMapper.toResponse(evenementRepository.save(evenement));
     }
 
-    // ---------- READ ----------
     @Transactional(readOnly = true)
     public Page<EventResponseDTO> search(StatutEvenement statut, String q, Pageable pageable) {
         String keyword = (q == null) ? "" : q.trim();
-        return evenementRepository.search(statut, keyword, pageable).map(this::toResponse);
+        return evenementRepository.search(statut, keyword, pageable).map(eventMapper::toResponse);
     }
 
     @Transactional(readOnly = true)
     public EventResponseDTO findById(Long id) {
-        return toResponse(findEvenement(id));
+        return eventMapper.toResponse(findEvenement(id));
     }
 
     @Transactional(readOnly = true)
@@ -75,20 +77,19 @@ public class EventService {
         if (!organisateurRepository.existsById(organisateurId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Organisateur introuvable : " + organisateurId);
         }
-        return evenementRepository.findByOrganisateurIdOrderByDateDebutDesc(organisateurId).stream().map(this::toResponse).toList();
+        return eventMapper.toResponseList(evenementRepository.findByOrganisateurIdOrderByDateDebutDesc(organisateurId));
     }
 
     @Transactional(readOnly = true)
     public List<EventResponseDTO> findAVenir() {
-        return evenementRepository.findByStatutAndDateDebutAfterOrderByDateDebutAsc(StatutEvenement.PUBLIE, LocalDateTime.now()).stream().map(this::toResponse).toList();
+        return eventMapper.toResponseList(evenementRepository.findByStatutAndDateDebutAfterOrderByDateDebutAsc(StatutEvenement.PUBLIE, LocalDateTime.now()));
     }
 
     @Transactional(readOnly = true)
     public List<EventResponseDTO> findEnVente() {
-        return evenementRepository.findEnVente(StatutEvenement.PUBLIE, LocalDateTime.now()).stream().map(this::toResponse).toList();
+        return eventMapper.toResponseList(evenementRepository.findEnVente(StatutEvenement.PUBLIE, LocalDateTime.now()));
     }
 
-    // ---------- UPDATE ----------
     @Transactional
     public EventResponseDTO update(Long id, EventRequestDTO dto) {
 
@@ -100,13 +101,13 @@ public class EventService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La capacite ne peut pas etre inferieure au total des categories de billets (" + totalCategories + ")");
         }
 
-        apply(evenement, dto);
+        eventMapper.updateEntity(dto, evenement);   // fills the existing managed entity
+        nettoyer(evenement);
 
         // no save() needed: the entity is managed, Hibernate flushes the changes
-        return toResponse(evenement);
+        return eventMapper.toResponse(evenement);
     }
 
-    // ---------- STATUS CHANGES ----------
     @Transactional
     public EventResponseDTO publier(Long id) {
 
@@ -130,7 +131,7 @@ public class EventService {
         }
 
         evenement.setStatut(StatutEvenement.PUBLIE);
-        return toResponse(evenement);
+        return eventMapper.toResponse(evenement);
     }
 
     @Transactional
@@ -144,10 +145,9 @@ public class EventService {
 
         evenement.setStatut(StatutEvenement.ANNULE);
         // TODO: cancel the pending reservations and create the refunds for paid ones
-        return toResponse(evenement);
+        return eventMapper.toResponse(evenement);
     }
 
-    // ---------- DELETE ----------
     @Transactional
     public void delete(Long id) {
 
@@ -177,18 +177,9 @@ public class EventService {
         return evenement.getCategories().stream().mapToInt(CategorieBillet::getQuantiteTotal).sum();
     }
 
-    private void apply(Evenement e, EventRequestDTO dto) {
-        e.setTitre(dto.titre().trim());
-        e.setDescription(dto.description());
-        e.setLieu(dto.lieu().trim());
-        e.setDateDebut(dto.dateDebut());
-        e.setDateFin(dto.dateFin());
-        e.setDateOuvertureVente(dto.dateOuvertureVente());
-        e.setDateClotureVente(dto.dateClotureVente());
-        e.setCapacite(dto.capacite());
-    }
-
-    private EventResponseDTO toResponse(Evenement e) {
-        return new EventResponseDTO(e.getId(), e.getTitre(), e.getDescription(), e.getLieu(), e.getDateDebut(), e.getDateFin(), e.getDateOuvertureVente(), e.getDateClotureVente(), e.getStatut(), e.getCapacite(), e.getOrganisateur().getId(), e.getOrganisateur().getNomOrganisation());
+    // the mapper copies values as they are, so we trim the text fields here
+    private void nettoyer(Evenement e) {
+        e.setTitre(e.getTitre().trim());
+        e.setLieu(e.getLieu().trim());
     }
 }

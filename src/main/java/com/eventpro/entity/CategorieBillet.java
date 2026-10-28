@@ -1,15 +1,17 @@
 package com.eventpro.entity;
 
-import com.eventpro.enums.*;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.math.BigDecimal;
-import java.time.*;
-import java.util.*;
 
 @Entity
 @Table(name = "categories_billet")
-@Getter @Setter @NoArgsConstructor
+@Getter
+@Setter
+@NoArgsConstructor
 public class CategorieBillet {
 
     @Id
@@ -25,8 +27,17 @@ public class CategorieBillet {
     private int quantiteTotal;
 
     private int quotaMaxParClient;
+    @Column(nullable = false, columnDefinition = "integer default 0")
+    private int placesReservees = 0;
 
+    @Column(nullable = false, columnDefinition = "integer default 0")
+    private int placesVendues = 0;
+    
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "evenement_id")
     private Evenement evenement;
+
+    public int placesDisponibles() {
+        return quantiteTotal - (placesReservees + placesVendues);
+    }
 }

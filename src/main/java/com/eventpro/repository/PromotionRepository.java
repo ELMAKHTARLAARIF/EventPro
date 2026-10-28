@@ -1,7 +1,9 @@
 package com.eventpro.repository;
 
 import com.eventpro.entity.Promotion;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -33,4 +35,7 @@ public interface PromotionRepository extends JpaRepository<Promotion, Long> {
               and p.nombreUtilisations < p.limiteUtilisation
             """)
     List<Promotion> findActives(@Param("evenementId") Long evenementId, @Param("today") LocalDate today);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<Promotion> findWithLockByCodeIgnoreCaseAndEvenementId(String code, Long evenementId);
 }
