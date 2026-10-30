@@ -26,7 +26,6 @@ public class PaymentService {
         this.paymentMapper = paymentMapper;
     }
 
-    // ---------- CREATE (simple version: the payment always succeeds) ----------
     @Transactional
     public Paiement creerPaiement(Reservation reservation) {
 
@@ -38,7 +37,7 @@ public class PaymentService {
         paiement.setReservation(reservation);
 
         paiementRepository.save(paiement);
-        reservation.setPaiement(paiement);   // keeps both Java objects consistent
+        reservation.setPaiement(paiement);
         return paiement;
     }
 

@@ -61,7 +61,6 @@ public class ReservationService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ce compte est desactive");
         }
 
-        // stock: locked by CategorieBilletService
         Map<Long, CategorieBillet> categories = categorieService.verrouiller(idsDe(dto.lignes()), evenement.getId());
 
         Reservation reservation = new Reservation();
@@ -85,7 +84,6 @@ public class ReservationService {
     @Transactional
     public ReservationResponseDTO update(Long reservationId, ReservationUpdateDTO dto) {
 
-        // lock the reservation first, then the categories (always this order)
         Reservation reservation = reservationRepository.findByIdForUpdate(reservationId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation introuvable : " + reservationId));
 
         if (reservation.getStatut() != StatutReservation.EN_ATTENTE) {
@@ -98,23 +96,19 @@ public class ReservationService {
         Evenement evenement = reservation.getEvenement();
         verifierVentesOuvertes(evenement);
 
-        // lock old AND new categories together
         Set<Long> ids = new LinkedHashSet<>(idsDe(dto.lignes()));
         reservation.getLignes().forEach(l -> ids.add(l.getCategorie().getId()));
         Map<Long, CategorieBillet> categories = categorieService.verrouiller(ids, evenement.getId());
 
-        // 1. release the old places and the old promo use
         for (LigneReservation ancienne : reservation.getLignes()) {
             categorieService.libererPlaces(categories.get(ancienne.getCategorie().getId()), ancienne.getQuantite());
         }
         libererPromotion(reservation);
-        reservation.getLignes().clear();   // orphanRemoval deletes the old lines
+        reservation.getLignes().clear();
 
-        // 2. apply the new lines and promo (same rules as create)
         ajouterLignes(reservation, dto.lignes(), categories);
         appliquerPromotion(reservation, dto.codePromo());
 
-        // no save() needed: the reservation is managed
         return reservationMapper.toResponse(reservation);
     }
 
@@ -129,7 +123,6 @@ public class ReservationService {
         return reservationMapper.toResponseList(reservationRepository.findByEvenementIdOrderByDateCreationDesc(evenementId));
     }
 
-    // ---------- coordination: payment, stock sold, tickets ----------
     private void confirmer(Reservation reservation) {
 
         paymentService.creerPaiement(reservation);
@@ -143,7 +136,6 @@ public class ReservationService {
         reservation.setStatut(StatutReservation.CONFIRMEE);
     }
 
-    // ---------- reservation rules ----------
     private List<Long> idsDe(List<LigneReservationRequestDTO> lignes) {
         return lignes.stream().map(LigneReservationRequestDTO::categorieId).toList();
     }
@@ -151,7 +143,6 @@ public class ReservationService {
     private void ajouterLignes(Reservation reservation, List<LigneReservationRequestDTO> lignes, Map<Long, CategorieBillet> categories) {
 
         Long clientId = reservation.getClient().getId();
-        // a new reservation has no id yet: 0 excludes nothing
         Long exclure = reservation.getId() == null ? 0L : reservation.getId();
 
         for (LigneReservationRequestDTO l : lignes) {
@@ -162,13 +153,11 @@ public class ReservationService {
             }
             int quantite = l.quantite();
 
-            // quota per client: a reservation rule
             long dejaReservee = reservationRepository.quantiteDejaReservee(clientId, categorie.getId(), STATUTS_ACTIFS, exclure);
             if (dejaReservee + quantite > categorie.getQuotaMaxParClient()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Quota depasse pour la categorie " + categorie.getNom() + " : maximum " + categorie.getQuotaMaxParClient() + " par client (vous en avez deja " + dejaReservee + " dans d'autres reservations)");
             }
 
-            // stock: handled by CategorieBilletService
             categorieService.reserverPlaces(categorie, quantite);
 
             LigneReservation ligne = new LigneReservation();
@@ -200,7 +189,6 @@ public class ReservationService {
         reservation.setMontantTotal(sousTotal.subtract(remise).max(BigDecimal.ZERO));
     }
 
-    // gives back the promo use taken by this reservation
     private void libererPromotion(Reservation reservation) {
         Promotion ancienne = reservation.getPromotion();
         if (ancienne != null) {
