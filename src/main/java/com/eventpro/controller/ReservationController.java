@@ -2,6 +2,7 @@ package com.eventpro.controller;
 
 import com.eventpro.dto.ReservationRequestDTO;
 import com.eventpro.dto.ReservationResponseDTO;
+import com.eventpro.dto.ReservationUpdateDTO;
 import com.eventpro.service.ReservationService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -29,5 +30,13 @@ public class ReservationController {
     public ResponseEntity<List<ReservationResponseDTO>> findAllByEvenement(@PathVariable Long evenementId) {
 
         return ResponseEntity.ok(reservationService.findAllByEvenementId(evenementId));
+    }
+
+    @PutMapping("/reservations/{id}")
+    public ResponseEntity<ReservationResponseDTO> update(
+            @PathVariable Long id,
+            @Valid @RequestBody ReservationUpdateDTO dto) {
+
+        return ResponseEntity.ok(reservationService.update(id, dto));
     }
 }

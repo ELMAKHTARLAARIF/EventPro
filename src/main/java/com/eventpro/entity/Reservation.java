@@ -1,15 +1,21 @@
 package com.eventpro.entity;
 
-import com.eventpro.enums.*;
+import com.eventpro.enums.StatutReservation;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.math.BigDecimal;
-import java.time.*;
-import java.util.*;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "reservations")
-@Getter @Setter @NoArgsConstructor
+@Getter
+@Setter
+@NoArgsConstructor
 public class Reservation {
 
     @Id
@@ -55,8 +61,6 @@ public class Reservation {
     }
 
     public BigDecimal calculerTotal() {
-        return lignes.stream()
-                .map(LigneReservation::getSousTotal)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return lignes.stream().map(LigneReservation::getSousTotal).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }

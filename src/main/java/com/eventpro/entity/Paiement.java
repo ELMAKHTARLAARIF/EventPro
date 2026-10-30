@@ -23,6 +23,9 @@ public class Paiement {
     private BigDecimal montant;
 
     private LocalDateTime datePaiement;
+    //request never pays twice
+    @Column(nullable = false, unique = true, length = 100)
+    private String cleIdempotence;
 
     @Enumerated(EnumType.STRING)
     private StatutPaiement statut = StatutPaiement.EN_ATTENTE;

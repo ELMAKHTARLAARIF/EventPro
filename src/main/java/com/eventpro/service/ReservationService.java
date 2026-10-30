@@ -3,11 +3,15 @@ package com.eventpro.service;
 import com.eventpro.dto.LigneReservationRequestDTO;
 import com.eventpro.dto.ReservationRequestDTO;
 import com.eventpro.dto.ReservationResponseDTO;
+import com.eventpro.dto.ReservationUpdateDTO;
 import com.eventpro.entity.*;
 import com.eventpro.enums.StatutEvenement;
 import com.eventpro.enums.StatutReservation;
 import com.eventpro.mapper.ReservationMapper;
-import com.eventpro.repository.*;
+import com.eventpro.repository.ClientRepository;
+import com.eventpro.repository.EvenementRepository;
+import com.eventpro.repository.PromotionRepository;
+import com.eventpro.repository.ReservationRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,11 +20,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.Year;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.util.*;
 
 @Service
 public class ReservationService {
@@ -32,25 +32,27 @@ public class ReservationService {
     private final ReservationRepository reservationRepository;
     private final EvenementRepository evenementRepository;
     private final ClientRepository clientRepository;
-    private final CategorieBilletRepository categorieRepository;
     private final PromotionRepository promotionRepository;
+    private final CategorieBilletService categorieService;
+    private final PaymentService paymentService;
+    private final TicketService ticketService;
     private final ReservationMapper reservationMapper;
 
-    public ReservationService(ReservationRepository reservationRepository, EvenementRepository evenementRepository, ClientRepository clientRepository, CategorieBilletRepository categorieRepository, PromotionRepository promotionRepository, ReservationMapper reservationMapper) {
+    public ReservationService(ReservationRepository reservationRepository, EvenementRepository evenementRepository, ClientRepository clientRepository, PromotionRepository promotionRepository, CategorieBilletService categorieService, PaymentService paymentService, TicketService ticketService, ReservationMapper reservationMapper) {
         this.reservationRepository = reservationRepository;
         this.evenementRepository = evenementRepository;
         this.clientRepository = clientRepository;
-        this.categorieRepository = categorieRepository;
         this.promotionRepository = promotionRepository;
+        this.categorieService = categorieService;
+        this.paymentService = paymentService;
+        this.ticketService = ticketService;
         this.reservationMapper = reservationMapper;
     }
 
     // ---------- CREATE ----------
-    // everything below runs in ONE transaction: the locks are released at the commit
     @Transactional
     public ReservationResponseDTO create(ReservationRequestDTO dto) {
 
-        // event and client
         Evenement evenement = evenementRepository.findById(dto.evenementId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Evenement introuvable : " + dto.evenementId()));
         verifierVentesOuvertes(evenement);
 
@@ -59,12 +61,9 @@ public class ReservationService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ce compte est desactive");
         }
 
-        // lock all requested categories (SELECT ... FOR UPDATE)
-        List<Long> ids = dto.lignes().stream().map(LigneReservationRequestDTO::categorieId).toList();
+        // stock: locked by CategorieBilletService
+        Map<Long, CategorieBillet> categories = categorieService.verrouiller(idsDe(dto.lignes()), evenement.getId());
 
-        Map<Long, CategorieBillet> categories = categorieRepository.findAllForUpdate(ids, evenement.getId()).stream().collect(Collectors.toMap(CategorieBillet::getId, Function.identity()));
-
-        // build the reservation and its lines
         Reservation reservation = new Reservation();
         reservation.setReference(genererReference());
         reservation.setClient(client);
@@ -73,56 +72,50 @@ public class ReservationService {
         reservation.setDateCreation(LocalDateTime.now());
         reservation.setDateExpiration(reservation.getDateCreation().plusMinutes(DUREE_BLOCAGE_MINUTES));
 
-        for (LigneReservationRequestDTO l : dto.lignes()) {
-                  // verefie categoryBillet for event
-            CategorieBillet categorie = categories.get(l.categorieId());
-            if (categorie == null) {
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "La categorie " + l.categorieId() + " n'appartient pas a cet evenement");
-            }
-            int quantite = l.quantite();
+        ajouterLignes(reservation, dto.lignes(), categories);
+        appliquerPromotion(reservation, dto.codePromo());
 
-            // quota per client (counts pending and confirmed reservations)
-            long dejaReservee = reservationRepository.quantiteDejaReservee(client.getId(), categorie.getId(), STATUTS_ACTIFS);
-            if (dejaReservee + quantite > categorie.getQuotaMaxParClient()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Quota depasse pour la categorie " + categorie.getNom() + " : maximum " + categorie.getQuotaMaxParClient() + " par client (vous en avez deja " + dejaReservee + ")");
-            }
+        Reservation saved = reservationRepository.save(reservation);
+        confirmer(saved);
 
-            // stock: placesDisponibles = quantiteTotal - (placesReservees + placesVendues)
-            if (quantite > categorie.placesDisponibles()) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Stock insuffisant pour la categorie " + categorie.getNom() + " : " + categorie.placesDisponibles() + " place(s) disponible(s)");
-            }
-            // calcule new place reserve
-            categorie.setPlacesReservees(categorie.getPlacesReservees() + quantite);
+        return reservationMapper.toResponse(saved);
+    }
 
-            // line: the price is copied from the category, never taken from the client
-            LigneReservation ligne = new LigneReservation();
-            ligne.setCategorie(categorie);
-            ligne.setQuantite(quantite);
-            ligne.setPrixUnitaire(categorie.getPrixUnitaire());
-            ligne.setSousTotal(categorie.getPrixUnitaire().multiply(BigDecimal.valueOf(quantite)));
-            reservation.addLigne(ligne);
+    // ---------- UPDATE ----------
+    @Transactional
+    public ReservationResponseDTO update(Long reservationId, ReservationUpdateDTO dto) {
+
+        // lock the reservation first, then the categories (always this order)
+        Reservation reservation = reservationRepository.findByIdForUpdate(reservationId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation introuvable : " + reservationId));
+
+        if (reservation.getStatut() != StatutReservation.EN_ATTENTE) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Seule une reservation en attente de paiement peut etre modifiee");
+        }
+        if (LocalDateTime.now().isAfter(reservation.getDateExpiration())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cette reservation a expire, creez-en une nouvelle");
         }
 
-        // promotion
-        BigDecimal sousTotal = reservation.calculerTotal();
-        BigDecimal remise = BigDecimal.ZERO;
+        Evenement evenement = reservation.getEvenement();
+        verifierVentesOuvertes(evenement);
 
-        if (dto.codePromo() != null && !dto.codePromo().isBlank()) {
-            Promotion promotion = promotionRepository.findWithLockByCodeIgnoreCaseAndEvenementId(dto.codePromo().trim(), evenement.getId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Code promo inconnu pour cet evenement"));
+        // lock old AND new categories together
+        Set<Long> ids = new LinkedHashSet<>(idsDe(dto.lignes()));
+        reservation.getLignes().forEach(l -> ids.add(l.getCategorie().getId()));
+        Map<Long, CategorieBillet> categories = categorieService.verrouiller(ids, evenement.getId());
 
-            if (!promotion.estUtilisable()) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Ce code promo n'est plus valide (expire ou limite atteinte)");
-            }
-
-            remise = promotion.calculerReduction(sousTotal);
-            promotion.setNombreUtilisations(promotion.getNombreUtilisations() + 1);
-            reservation.setPromotion(promotion);
+        // 1. release the old places and the old promo use
+        for (LigneReservation ancienne : reservation.getLignes()) {
+            categorieService.libererPlaces(categories.get(ancienne.getCategorie().getId()), ancienne.getQuantite());
         }
+        libererPromotion(reservation);
+        reservation.getLignes().clear();   // orphanRemoval deletes the old lines
 
-        // total = sousTotal - remise, never below 0
-        reservation.setMontantTotal(sousTotal.subtract(remise).max(BigDecimal.ZERO));
+        // 2. apply the new lines and promo (same rules as create)
+        ajouterLignes(reservation, dto.lignes(), categories);
+        appliquerPromotion(reservation, dto.codePromo());
 
-        return reservationMapper.toResponse(reservationRepository.save(reservation));
+        // no save() needed: the reservation is managed
+        return reservationMapper.toResponse(reservation);
     }
 
     // ---------- READ ----------
@@ -136,7 +129,86 @@ public class ReservationService {
         return reservationMapper.toResponseList(reservationRepository.findByEvenementIdOrderByDateCreationDesc(evenementId));
     }
 
-    // ---------- helpers ----------
+    // ---------- coordination: payment, stock sold, tickets ----------
+    private void confirmer(Reservation reservation) {
+
+        paymentService.creerPaiement(reservation);
+
+        for (LigneReservation ligne : reservation.getLignes()) {
+            categorieService.confirmerVente(ligne.getCategorie(), ligne.getQuantite());
+        }
+
+        ticketService.genererBillets(reservation);
+
+        reservation.setStatut(StatutReservation.CONFIRMEE);
+    }
+
+    // ---------- reservation rules ----------
+    private List<Long> idsDe(List<LigneReservationRequestDTO> lignes) {
+        return lignes.stream().map(LigneReservationRequestDTO::categorieId).toList();
+    }
+
+    private void ajouterLignes(Reservation reservation, List<LigneReservationRequestDTO> lignes, Map<Long, CategorieBillet> categories) {
+
+        Long clientId = reservation.getClient().getId();
+        // a new reservation has no id yet: 0 excludes nothing
+        Long exclure = reservation.getId() == null ? 0L : reservation.getId();
+
+        for (LigneReservationRequestDTO l : lignes) {
+
+            CategorieBillet categorie = categories.get(l.categorieId());
+            if (categorie == null) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "La categorie " + l.categorieId() + " n'appartient pas a cet evenement");
+            }
+            int quantite = l.quantite();
+
+            // quota per client: a reservation rule
+            long dejaReservee = reservationRepository.quantiteDejaReservee(clientId, categorie.getId(), STATUTS_ACTIFS, exclure);
+            if (dejaReservee + quantite > categorie.getQuotaMaxParClient()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Quota depasse pour la categorie " + categorie.getNom() + " : maximum " + categorie.getQuotaMaxParClient() + " par client (vous en avez deja " + dejaReservee + " dans d'autres reservations)");
+            }
+
+            // stock: handled by CategorieBilletService
+            categorieService.reserverPlaces(categorie, quantite);
+
+            LigneReservation ligne = new LigneReservation();
+            ligne.setCategorie(categorie);
+            ligne.setQuantite(quantite);
+            ligne.setPrixUnitaire(categorie.getPrixUnitaire());
+            ligne.setSousTotal(categorie.getPrixUnitaire().multiply(BigDecimal.valueOf(quantite)));
+            reservation.addLigne(ligne);
+        }
+    }
+
+    private void appliquerPromotion(Reservation reservation, String codePromo) {
+
+        BigDecimal sousTotal = reservation.calculerTotal();
+        BigDecimal remise = BigDecimal.ZERO;
+
+        if (codePromo != null && !codePromo.isBlank()) {
+            Promotion promotion = promotionRepository.findWithLockByCodeIgnoreCaseAndEvenementId(codePromo.trim(), reservation.getEvenement().getId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Code promo inconnu pour cet evenement"));
+
+            if (!promotion.estUtilisable()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Ce code promo n'est plus valide (expire ou limite atteinte)");
+            }
+
+            remise = promotion.calculerReduction(sousTotal);
+            promotion.setNombreUtilisations(promotion.getNombreUtilisations() + 1);
+            reservation.setPromotion(promotion);
+        }
+
+        reservation.setMontantTotal(sousTotal.subtract(remise).max(BigDecimal.ZERO));
+    }
+
+    // gives back the promo use taken by this reservation
+    private void libererPromotion(Reservation reservation) {
+        Promotion ancienne = reservation.getPromotion();
+        if (ancienne != null) {
+            promotionRepository.findWithLockByCodeIgnoreCaseAndEvenementId(ancienne.getCode(), reservation.getEvenement().getId()).ifPresent(p -> p.setNombreUtilisations(Math.max(0, p.getNombreUtilisations() - 1)));
+            reservation.setPromotion(null);
+        }
+    }
+
     private void verifierVentesOuvertes(Evenement evenement) {
         LocalDateTime now = LocalDateTime.now();
 

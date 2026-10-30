@@ -8,12 +8,16 @@ import com.eventpro.enums.StatutEvenement;
 import com.eventpro.mapper.CategorieBilletMapper;
 import com.eventpro.repository.CategorieBilletRepository;
 import com.eventpro.repository.EvenementRepository;
-import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class CategorieBilletService {
@@ -28,6 +32,7 @@ public class CategorieBilletService {
         this.categorieMapper = categorieMapper;
     }
 
+    // ---------- CREATE ----------
     @Transactional
     public CategorieBilletResponseDTO create(Long evenementId, CategorieBilletRequestDTO dto) {
 
@@ -37,47 +42,55 @@ public class CategorieBilletService {
         if (categorieRepository.existsByNomIgnoreCaseAndEvenementId(dto.nom().trim(), evenementId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cette categorie existe deja pour cet evenement");
         }
+
         long total = categorieRepository.totalQuantite(evenementId) + dto.quantiteTotal();
         verifierCapacite(evenement, total);
 
-        CategorieBillet categorieBillet = categorieMapper.toEntity(dto);
-        categorieBillet.setEvenement(evenement);
-        categorieRepository.save(categorieBillet);
+        CategorieBillet categorie = categorieMapper.toEntity(dto);
+        categorie.setEvenement(evenement);
 
-        return categorieMapper.toResponse(categorieBillet);
-
+        return categorieMapper.toResponse(categorieRepository.save(categorie));
     }
 
+    // ---------- READ ----------
     @Transactional(readOnly = true)
-    public CategorieBilletResponseDTO findByEvenement(Long evenementId) {
+    public List<CategorieBilletResponseDTO> findByEvenement(Long evenementId) {
         findEvenement(evenementId);
-        return categorieMapper.toResponse(categorieRepository.findById(evenementId).get());
-
+        return categorieMapper.toResponseList(categorieRepository.findByEvenementId(evenementId));
     }
 
     @Transactional(readOnly = true)
-    public CategorieBilletResponseDTO findOne(Long evenementId, Long categoryBilletId) {
-        return categorieMapper.toResponse(findCategorie(evenementId, categoryBilletId));
+    public CategorieBilletResponseDTO findOne(Long evenementId, Long categorieId) {
+        return categorieMapper.toResponse(findCategorie(evenementId, categorieId));
     }
 
-    public CategorieBilletResponseDTO update(Long evenementId, Long categoryBilletId, @Valid @RequestBody CategorieBilletRequestDTO dto) {
-        CategorieBillet categorieBillet = findCategorie(evenementId, categoryBilletId);
-        Evenement evenement = categorieBillet.getEvenement();
+    // ---------- UPDATE ----------
+    @Transactional
+    public CategorieBilletResponseDTO update(Long evenementId, Long categorieId, CategorieBilletRequestDTO dto) {
+
+        CategorieBillet categorie = findCategorie(evenementId, categorieId);
+        Evenement evenement = categorie.getEvenement();
         verifierModifiable(evenement);
-        if (categorieRepository.existsByNomIgnoreCaseAndEvenementIdAndIdNot(dto.nom().trim(), evenementId, categoryBilletId)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cette categorie existe deja pour cet identifiant");
+
+        if (categorieRepository.existsByNomIgnoreCaseAndEvenementIdAndIdNot(dto.nom().trim(), evenementId, categorieId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cette categorie existe deja pour cet evenement");
         }
-        int utilisees = categorieBillet.getPlacesReservees() + categorieBillet.getPlacesVendues();
+
+        int utilisees = categorie.getPlacesReservees() + categorie.getPlacesVendues();
         if (dto.quantiteTotal() < utilisees) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La quantite totale ne peut pas etre inferieure aux places deja reservees ou vendues (" + utilisees + ")");
         }
-        long autres = categorieRepository.totalQuantite(evenementId) - categorieBillet.getQuantiteTotal(); // quantite total 9dima - quantite dyal categorieBillet li ghadi n updatew bch n9dro n calculew Q jdida
-        verifierCapacite(evenement, autres + dto.quantiteTotal()); // dto.quantiteTotal the new  Quantite dyal hd CategorieBillet
-        categorieMapper.updateEntity(dto, categorieBillet);
-        return categorieMapper.toResponse(categorieBillet);
 
+        long autres = categorieRepository.totalQuantite(evenementId) - categorie.getQuantiteTotal();
+        verifierCapacite(evenement, autres + dto.quantiteTotal());
+
+        categorieMapper.updateEntity(dto, categorie);
+
+        // no save() needed: the entity is managed
+        return categorieMapper.toResponse(categorie);
     }
 
+    // ---------- DELETE ----------
     @Transactional
     public void delete(Long evenementId, Long categorieId) {
 
@@ -90,13 +103,43 @@ public class CategorieBilletService {
         categorieRepository.delete(categorie);
     }
 
+    // ---------- STOCK (used by ReservationService) ----------
+
+    // SELECT ... FOR UPDATE: nobody else can change these categories until the commit
+    @Transactional
+    public Map<Long, CategorieBillet> verrouiller(Collection<Long> ids, Long evenementId) {
+        return categorieRepository.findAllForUpdate(ids, evenementId).stream().collect(Collectors.toMap(CategorieBillet::getId, Function.identity()));
+    }
+
+    // checks the stock, then blocks the places
+    @Transactional
+    public void reserverPlaces(CategorieBillet categorie, int quantite) {
+        if (quantite > categorie.placesDisponibles()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Stock insuffisant pour la categorie " + categorie.getNom() + " : " + categorie.placesDisponibles() + " place(s) disponible(s)");
+        }
+        categorie.setPlacesReservees(categorie.getPlacesReservees() + quantite);
+    }
+
+    // gives the blocked places back
+    @Transactional
+    public void libererPlaces(CategorieBillet categorie, int quantite) {
+        categorie.setPlacesReservees(Math.max(0, categorie.getPlacesReservees() - quantite));
+    }
+
+    // reserved -> sold
+    @Transactional
+    public void confirmerVente(CategorieBillet categorie, int quantite) {
+        categorie.setPlacesReservees(Math.max(0, categorie.getPlacesReservees() - quantite));
+        categorie.setPlacesVendues(categorie.getPlacesVendues() + quantite);
+    }
+
     // ---------- helpers ----------
     private Evenement findEvenement(Long evenementId) {
         return evenementRepository.findById(evenementId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Evenement introuvable : " + evenementId));
     }
 
-    private CategorieBillet findCategorie(Long evenementId, Long categoryBilletId) {
-        return categorieRepository.findByIdAndEvenementId(categoryBilletId, evenementId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Categorie " + categoryBilletId + " introuvable pour l'evenement " + evenementId));
+    private CategorieBillet findCategorie(Long evenementId, Long categorieId) {
+        return categorieRepository.findByIdAndEvenementId(categorieId, evenementId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Categorie " + categorieId + " introuvable pour l'evenement " + evenementId));
     }
 
     private void verifierModifiable(Evenement evenement) {
