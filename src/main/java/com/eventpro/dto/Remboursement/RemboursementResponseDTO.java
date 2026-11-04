@@ -1,6 +1,6 @@
-package com.eventpro.dto;
+package com.eventpro.dto.Remboursement;
 
-import com.eventpro.enums.StatutPaiement;
+import com.eventpro.enums.StatutRemboursement;
 import com.eventpro.enums.StatutReservation;
 import lombok.Builder;
 
@@ -8,12 +8,13 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Builder
-public record PaymentResponseDTO(
+public record RemboursementResponseDTO(
         Long id,
-        String reference,
         BigDecimal montant,
-        LocalDateTime datePaiement,
-        StatutPaiement statut,
+        String motif,
+        LocalDateTime dateDemande,
+        StatutRemboursement statut,
+        Long paiementId,
         Long reservationId,
         StatutReservation reservationStatut
 ) {}

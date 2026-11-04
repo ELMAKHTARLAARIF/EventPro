@@ -1,6 +1,6 @@
 package com.eventpro.controller;
 
-import com.eventpro.dto.PaymentResponseDTO;
+import com.eventpro.dto.payment.PaymentResponseDTO;
 import com.eventpro.service.PaymentService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

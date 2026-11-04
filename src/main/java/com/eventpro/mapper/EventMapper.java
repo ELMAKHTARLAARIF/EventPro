@@ -1,7 +1,7 @@
 package com.eventpro.mapper;
 
-import com.eventpro.dto.EventRequestDTO;
-import com.eventpro.dto.EventResponseDTO;
+import com.eventpro.dto.event.EventRequestDTO;
+import com.eventpro.dto.event.EventResponseDTO;
 import com.eventpro.entity.Evenement;
 import org.mapstruct.*;
 

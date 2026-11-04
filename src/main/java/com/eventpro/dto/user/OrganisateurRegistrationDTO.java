@@ -1,4 +1,4 @@
-package com.eventpro.dto;
+package com.eventpro.dto.user;
 
 public record OrganisateurRegistrationDTO(
         String nom,

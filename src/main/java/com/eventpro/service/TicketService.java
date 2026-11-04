@@ -60,4 +60,15 @@ public class TicketService {
 
         return ticketMapper.toResponseList(billetRepository.findByLigneReservationReservationIdOrderById(reservationId));
     }
+
+    // for remboursement
+    // every ticket of the reservation becomes invalid
+    @Transactional
+    public void annulerBillets(Reservation reservation) {
+        for (LigneReservation ligne : reservation.getLignes()) {
+            for (Billet billet : ligne.getBillets()) {
+                billet.setStatut(StatutBillet.ANNULE);
+            }
+        }
+    }
 }

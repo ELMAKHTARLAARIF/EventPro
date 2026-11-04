@@ -1,7 +1,7 @@
 package com.eventpro.service;
 
-import com.eventpro.dto.CategorieBilletRequestDTO;
-import com.eventpro.dto.CategorieBilletResponseDTO;
+import com.eventpro.dto.category_billet.CategorieBilletRequestDTO;
+import com.eventpro.dto.category_billet.CategorieBilletResponseDTO;
 import com.eventpro.entity.CategorieBillet;
 import com.eventpro.entity.Evenement;
 import com.eventpro.enums.StatutEvenement;
@@ -152,5 +152,19 @@ public class CategorieBilletService {
         if (totalBillets > evenement.getCapacite()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Le total des billets (" + totalBillets + ") depasse la capacite de l'evenement (" + evenement.getCapacite() + ")");
         }
+    }
+
+
+
+
+
+
+
+//    for remboursement
+
+    // المقعد الذي استُردّت تكلفته لا يظلّ محجوزاً؛ بل يمكن بيعه مجدداً
+    @Transactional
+    public void annulerVente(CategorieBillet categorie, int quantite) {
+        categorie.setPlacesVendues(Math.max(0, categorie.getPlacesVendues() - quantite));
     }
 }

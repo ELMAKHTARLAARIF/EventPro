@@ -1,5 +1,5 @@
 package com.eventpro.enums;
 
 public enum StatutReservation {
-    EN_ATTENTE, CONFIRMEE, EXPIREE, ANNULEE
+    EN_ATTENTE, CONFIRMEE, EXPIREE, ANNULEE,REMBOURSEE
 }

@@ -1,4 +1,4 @@
-package com.eventpro.dto;
+package com.eventpro.dto.event;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.*;

@@ -1,6 +1,6 @@
 package com.eventpro.service;
 
-import com.eventpro.dto.ClientRegistrationDTO;
+import com.eventpro.dto.user.ClientRegistrationDTO;
 import com.eventpro.entity.Client;
 import com.eventpro.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;

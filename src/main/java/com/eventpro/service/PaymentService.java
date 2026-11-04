@@ -1,6 +1,6 @@
 package com.eventpro.service;
 
-import com.eventpro.dto.PaymentResponseDTO;
+import com.eventpro.dto.payment.PaymentResponseDTO;
 import com.eventpro.entity.Paiement;
 import com.eventpro.entity.Reservation;
 import com.eventpro.enums.StatutPaiement;

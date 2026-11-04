@@ -1,7 +1,7 @@
 package com.eventpro.controller;
 
-import com.eventpro.dto.EventRequestDTO;
-import com.eventpro.dto.EventResponseDTO;
+import com.eventpro.dto.event.EventRequestDTO;
+import com.eventpro.dto.event.EventResponseDTO;
 import com.eventpro.enums.StatutEvenement;
 import com.eventpro.service.EventService;
 import jakarta.validation.Valid;

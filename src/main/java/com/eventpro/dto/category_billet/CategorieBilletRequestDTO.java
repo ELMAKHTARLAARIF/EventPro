@@ -1,4 +1,4 @@
-package com.eventpro.dto;
+package com.eventpro.dto.category_billet;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.*;

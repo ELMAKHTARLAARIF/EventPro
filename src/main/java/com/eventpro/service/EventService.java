@@ -1,7 +1,7 @@
 package com.eventpro.service;
 
-import com.eventpro.dto.EventRequestDTO;
-import com.eventpro.dto.EventResponseDTO;
+import com.eventpro.dto.event.EventRequestDTO;
+import com.eventpro.dto.event.EventResponseDTO;
 import com.eventpro.entity.CategorieBillet;
 import com.eventpro.entity.Evenement;
 import com.eventpro.entity.Organisateur;

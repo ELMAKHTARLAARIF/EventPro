@@ -40,4 +40,13 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
               and l.reservation.id <> :excludeId
             """)
     long quantiteDejaReservee(@Param("clientId") Long clientId, @Param("categorieId") Long categorieId, @Param("statuts") Collection<StatutReservation> statuts, @Param("excludeId") Long excludeId);
+
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select r from Reservation r
+            where r.evenement.id = :evenementId and r.statut = :statut
+            order by r.id
+            """)
+    List<Reservation> findByEvenementAndStatutForUpdate(@Param("evenementId") Long evenementId, @Param("statut") StatutReservation statut);
 }

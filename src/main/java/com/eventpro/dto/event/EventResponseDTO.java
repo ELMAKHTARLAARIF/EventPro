@@ -1,4 +1,4 @@
-package com.eventpro.dto;
+package com.eventpro.dto.event;
 
 import com.eventpro.enums.StatutEvenement;
 import java.time.LocalDateTime;

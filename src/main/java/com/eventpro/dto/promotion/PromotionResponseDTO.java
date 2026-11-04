@@ -1,4 +1,4 @@
-package com.eventpro.dto;
+package com.eventpro.dto.promotion;
 
 import com.eventpro.enums.TypeReduction;
 import java.math.BigDecimal;

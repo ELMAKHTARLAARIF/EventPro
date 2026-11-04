@@ -29,4 +29,13 @@ public class Remboursement {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "paiement_id")
     private Paiement paiement;
+
+
+    public void approuver() {
+        this.statut = StatutRemboursement.APPROUVE;
+    }
+
+    public void refuser() {
+        this.statut = StatutRemboursement.REFUSE;
+    }
 }

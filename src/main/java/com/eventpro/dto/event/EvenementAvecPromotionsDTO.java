@@ -1,5 +1,6 @@
-package com.eventpro.dto;
+package com.eventpro.dto.event;
 
+import com.eventpro.dto.promotion.PromotionResponseDTO;
 import com.eventpro.enums.StatutEvenement;
 import java.time.LocalDateTime;
 import java.util.List;

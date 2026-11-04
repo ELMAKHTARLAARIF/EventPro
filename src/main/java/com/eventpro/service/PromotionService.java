@@ -1,9 +1,9 @@
 package com.eventpro.service;
 
-import com.eventpro.dto.EvenementAvecPromotionsDTO;
-import com.eventpro.dto.PromotionRequestDTO;
-import com.eventpro.dto.PromotionResponseDTO;
-import com.eventpro.dto.PromotionUpdateDTO;
+import com.eventpro.dto.event.EvenementAvecPromotionsDTO;
+import com.eventpro.dto.promotion.PromotionRequestDTO;
+import com.eventpro.dto.promotion.PromotionResponseDTO;
+import com.eventpro.dto.promotion.PromotionUpdateDTO;
 import com.eventpro.entity.Evenement;
 import com.eventpro.entity.Promotion;
 import com.eventpro.enums.StatutEvenement;

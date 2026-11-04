@@ -1,9 +1,9 @@
 package com.eventpro.service;
 
-import com.eventpro.dto.LigneReservationRequestDTO;
-import com.eventpro.dto.ReservationRequestDTO;
-import com.eventpro.dto.ReservationResponseDTO;
-import com.eventpro.dto.ReservationUpdateDTO;
+import com.eventpro.dto.reservation.LigneReservationRequestDTO;
+import com.eventpro.dto.reservation.ReservationRequestDTO;
+import com.eventpro.dto.reservation.ReservationResponseDTO;
+import com.eventpro.dto.reservation.ReservationUpdateDTO;
 import com.eventpro.entity.*;
 import com.eventpro.enums.StatutEvenement;
 import com.eventpro.enums.StatutReservation;

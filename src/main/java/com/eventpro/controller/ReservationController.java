@@ -1,8 +1,8 @@
 package com.eventpro.controller;
 
-import com.eventpro.dto.ReservationRequestDTO;
-import com.eventpro.dto.ReservationResponseDTO;
-import com.eventpro.dto.ReservationUpdateDTO;
+import com.eventpro.dto.reservation.ReservationRequestDTO;
+import com.eventpro.dto.reservation.ReservationResponseDTO;
+import com.eventpro.dto.reservation.ReservationUpdateDTO;
 import com.eventpro.service.ReservationService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;

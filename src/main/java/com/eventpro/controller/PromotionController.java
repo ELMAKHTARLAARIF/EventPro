@@ -1,9 +1,9 @@
 package com.eventpro.controller;
 
-import com.eventpro.dto.EvenementAvecPromotionsDTO;
-import com.eventpro.dto.PromotionRequestDTO;
-import com.eventpro.dto.PromotionResponseDTO;
-import com.eventpro.dto.PromotionUpdateDTO;
+import com.eventpro.dto.event.EvenementAvecPromotionsDTO;
+import com.eventpro.dto.promotion.PromotionRequestDTO;
+import com.eventpro.dto.promotion.PromotionResponseDTO;
+import com.eventpro.dto.promotion.PromotionUpdateDTO;
 import com.eventpro.service.PromotionService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;

@@ -1,7 +1,7 @@
 package com.eventpro.mapper;
 
-import com.eventpro.dto.LigneReservationResponseDTO;
-import com.eventpro.dto.ReservationResponseDTO;
+import com.eventpro.dto.reservation.LigneReservationResponseDTO;
+import com.eventpro.dto.reservation.ReservationResponseDTO;
 import com.eventpro.entity.LigneReservation;
 import com.eventpro.entity.Reservation;
 import org.mapstruct.Mapper;

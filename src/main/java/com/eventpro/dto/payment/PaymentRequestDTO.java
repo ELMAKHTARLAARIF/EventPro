@@ -1,4 +1,4 @@
-package com.eventpro.dto;
+package com.eventpro.dto.payment;
 
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;

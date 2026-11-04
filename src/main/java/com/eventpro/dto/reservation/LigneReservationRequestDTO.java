@@ -1,4 +1,4 @@
-package com.eventpro.dto;
+package com.eventpro.dto.reservation;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;

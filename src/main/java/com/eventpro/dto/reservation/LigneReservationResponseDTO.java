@@ -1,4 +1,4 @@
-package com.eventpro.dto;
+package com.eventpro.dto.reservation;
 
 import lombok.Builder;
 import java.math.BigDecimal;

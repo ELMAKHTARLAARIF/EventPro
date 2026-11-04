@@ -1,4 +1,4 @@
-package com.eventpro.dto;
+package com.eventpro.dto.reservation;
 
 import com.eventpro.enums.StatutReservation;
 import lombok.Builder;
