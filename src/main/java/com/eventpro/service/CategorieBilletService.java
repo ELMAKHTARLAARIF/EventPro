@@ -5,6 +5,10 @@ import com.eventpro.dto.category_billet.CategorieBilletResponseDTO;
 import com.eventpro.entity.CategorieBillet;
 import com.eventpro.entity.Evenement;
 import com.eventpro.enums.StatutEvenement;
+// EXCEPTION: our custom business exceptions (handled by GlobalExceptionHandler)
+import com.eventpro.exception.InsufficientStockException;
+import com.eventpro.exception.ResourceNotFoundException;
+import com.eventpro.exception.ValidationException;
 import com.eventpro.mapper.CategorieBilletMapper;
 import com.eventpro.repository.CategorieBilletRepository;
 import com.eventpro.repository.EvenementRepository;
@@ -22,12 +26,12 @@ import java.util.stream.Collectors;
 @Service
 public class CategorieBilletService {
 
-    private final CategorieBilletRepository categorieRepository;
+    private final CategorieBilletRepository categorieBilletRepository;
     private final EvenementRepository evenementRepository;
     private final CategorieBilletMapper categorieMapper;
 
-    public CategorieBilletService(CategorieBilletRepository categorieRepository, EvenementRepository evenementRepository, CategorieBilletMapper categorieMapper) {
-        this.categorieRepository = categorieRepository;
+    public CategorieBilletService(CategorieBilletRepository categorieBilletRepository, EvenementRepository evenementRepository, CategorieBilletMapper categorieMapper) {
+        this.categorieBilletRepository = categorieBilletRepository;
         this.evenementRepository = evenementRepository;
         this.categorieMapper = categorieMapper;
     }
@@ -39,24 +43,25 @@ public class CategorieBilletService {
         Evenement evenement = findEvenement(evenementId);
         verifierModifiable(evenement);
 
-        if (categorieRepository.existsByNomIgnoreCaseAndEvenementId(dto.nom().trim(), evenementId)) {
+        if (categorieBilletRepository.existsByNomIgnoreCaseAndEvenementId(dto.nom().trim(), evenementId)) {
+            // EXCEPTION: generic 409 (duplicate): no dedicated exception, so ResponseStatusException stays
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cette categorie existe deja pour cet evenement");
         }
 
-        long total = categorieRepository.totalQuantite(evenementId) + dto.quantiteTotal();
+        long total = categorieBilletRepository.totalQuantite(evenementId) + dto.quantiteTotal();
         verifierCapacite(evenement, total);
 
         CategorieBillet categorie = categorieMapper.toEntity(dto);
         categorie.setEvenement(evenement);
 
-        return categorieMapper.toResponse(categorieRepository.save(categorie));
+        return categorieMapper.toResponse(categorieBilletRepository.save(categorie));
     }
 
     // ---------- READ ----------
     @Transactional(readOnly = true)
     public List<CategorieBilletResponseDTO> findByEvenement(Long evenementId) {
         findEvenement(evenementId);
-        return categorieMapper.toResponseList(categorieRepository.findByEvenementId(evenementId));
+        return categorieMapper.toResponseList(categorieBilletRepository.findByEvenementId(evenementId));
     }
 
     @Transactional(readOnly = true)
@@ -72,16 +77,17 @@ public class CategorieBilletService {
         Evenement evenement = categorie.getEvenement();
         verifierModifiable(evenement);
 
-        if (categorieRepository.existsByNomIgnoreCaseAndEvenementIdAndIdNot(dto.nom().trim(), evenementId, categorieId)) {
+        if (categorieBilletRepository.existsByNomIgnoreCaseAndEvenementIdAndIdNot(dto.nom().trim(), evenementId, categorieId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cette categorie existe deja pour cet evenement");
         }
 
         int utilisees = categorie.getPlacesReservees() + categorie.getPlacesVendues();
         if (dto.quantiteTotal() < utilisees) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La quantite totale ne peut pas etre inferieure aux places deja reservees ou vendues (" + utilisees + ")");
+            // EXCEPTION: invalid value sent by the client -> ValidationException (HTTP 400)
+            throw new ValidationException("La quantite totale ne peut pas etre inferieure aux places deja reservees ou vendues (" + utilisees + ")");
         }
 
-        long autres = categorieRepository.totalQuantite(evenementId) - categorie.getQuantiteTotal();
+        long autres = categorieBilletRepository.totalQuantite(evenementId) - categorie.getQuantiteTotal();
         verifierCapacite(evenement, autres + dto.quantiteTotal());
 
         categorieMapper.updateEntity(dto, categorie);
@@ -100,7 +106,7 @@ public class CategorieBilletService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Une categorie ne peut etre supprimee que si l'evenement est en brouillon");
         }
 
-        categorieRepository.delete(categorie);
+        categorieBilletRepository.delete(categorie);
     }
 
     // ---------- STOCK (used by ReservationService) ----------
@@ -108,14 +114,15 @@ public class CategorieBilletService {
     // SELECT ... FOR UPDATE: nobody else can change these categories until the commit
     @Transactional
     public Map<Long, CategorieBillet> verrouiller(Collection<Long> ids, Long evenementId) {
-        return categorieRepository.findAllForUpdate(ids, evenementId).stream().collect(Collectors.toMap(CategorieBillet::getId, Function.identity()));
+        return categorieBilletRepository.findAllForUpdate(ids, evenementId).stream().collect(Collectors.toMap(CategorieBillet::getId, Function.identity()));
     }
 
     // checks the stock, then blocks the places
     @Transactional
     public void reserverPlaces(CategorieBillet categorie, int quantite) {
         if (quantite > categorie.placesDisponibles()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Stock insuffisant pour la categorie " + categorie.getNom() + " : " + categorie.placesDisponibles() + " place(s) disponible(s)");
+            // EXCEPTION: not enough free places -> InsufficientStockException (HTTP 409)
+            throw new InsufficientStockException("Stock insuffisant pour la categorie " + categorie.getNom() + " : " + categorie.placesDisponibles() + " place(s) disponible(s)");
         }
         categorie.setPlacesReservees(categorie.getPlacesReservees() + quantite);
     }
@@ -135,11 +142,12 @@ public class CategorieBilletService {
 
     // ---------- helpers ----------
     private Evenement findEvenement(Long evenementId) {
-        return evenementRepository.findById(evenementId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Evenement introuvable : " + evenementId));
+        // EXCEPTION: "not found" -> ResourceNotFoundException (HTTP 404)
+        return evenementRepository.findById(evenementId).orElseThrow(() -> new ResourceNotFoundException("Evenement introuvable : " + evenementId));
     }
 
     private CategorieBillet findCategorie(Long evenementId, Long categorieId) {
-        return categorieRepository.findByIdAndEvenementId(categorieId, evenementId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Categorie " + categorieId + " introuvable pour l'evenement " + evenementId));
+        return categorieBilletRepository.findByIdAndEvenementId(categorieId, evenementId).orElseThrow(() -> new ResourceNotFoundException("Categorie " + categorieId + " introuvable pour l'evenement " + evenementId));
     }
 
     private void verifierModifiable(Evenement evenement) {
@@ -150,7 +158,7 @@ public class CategorieBilletService {
 
     private void verifierCapacite(Evenement evenement, long totalBillets) {
         if (totalBillets > evenement.getCapacite()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Le total des billets (" + totalBillets + ") depasse la capacite de l'evenement (" + evenement.getCapacite() + ")");
+            throw new ValidationException("Le total des billets (" + totalBillets + ") depasse la capacite de l'evenement (" + evenement.getCapacite() + ")");
         }
     }
 

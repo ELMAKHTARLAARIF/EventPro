@@ -6,6 +6,9 @@ import com.eventpro.entity.CategorieBillet;
 import com.eventpro.entity.Evenement;
 import com.eventpro.entity.Organisateur;
 import com.eventpro.enums.StatutEvenement;
+// EXCEPTION: our custom business exceptions (handled by GlobalExceptionHandler)
+import com.eventpro.exception.ResourceNotFoundException;
+import com.eventpro.exception.ValidationException;
 import com.eventpro.mapper.EventMapper;
 import com.eventpro.repository.EvenementRepository;
 import com.eventpro.repository.OrganisateurRepository;
@@ -27,29 +30,34 @@ public class EventService {
     private final OrganisateurRepository organisateurRepository;
     private final PromotionRepository promotionRepository;
     private final EventMapper eventMapper;
+    private final RemboursementService remboursementService;
 
-    public EventService(EvenementRepository evenementRepository, OrganisateurRepository organisateurRepository, PromotionRepository promotionRepository, EventMapper eventMapper) {
+
+    public EventService(EvenementRepository evenementRepository, OrganisateurRepository organisateurRepository, PromotionRepository promotionRepository, EventMapper eventMapper, RemboursementService remboursementService) {
         this.evenementRepository = evenementRepository;
         this.organisateurRepository = organisateurRepository;
         this.promotionRepository = promotionRepository;
         this.eventMapper = eventMapper;
+        this.remboursementService = remboursementService;
     }
-
 
     @Transactional
     public EventResponseDTO create(EventRequestDTO dto) {
 
         if (dto.organisateurId() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "L'organisateur est obligatoire");
+            // EXCEPTION: missing/wrong data -> ValidationException (HTTP 400)
+            throw new ValidationException("L'organisateur est obligatoire");
         }
 
-        Organisateur organisateur = organisateurRepository.findById(dto.organisateurId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Organisateur introuvable : " + dto.organisateurId()));
+        // EXCEPTION: "not found" -> ResourceNotFoundException (HTTP 404)
+        Organisateur organisateur = organisateurRepository.findById(dto.organisateurId()).orElseThrow(() -> new ResourceNotFoundException("Organisateur introuvable : " + dto.organisateurId()));
 
         if (dto.dateDebut().isBefore(LocalDateTime.now())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La date de debut doit etre dans le futur");
+            throw new ValidationException("La date de debut doit etre dans le futur");
         }
 
         if (evenementRepository.existsByOrganisateurIdAndTitreIgnoreCaseAndDateDebut(organisateur.getId(), dto.titre().trim(), dto.dateDebut())) {
+            // EXCEPTION: generic 409 (duplicate): no dedicated exception, so ResponseStatusException stays
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Vous avez deja un evenement avec ce titre a cette date");
         }
 
@@ -75,7 +83,7 @@ public class EventService {
     @Transactional(readOnly = true)
     public List<EventResponseDTO> findByOrganisateur(Long organisateurId) {
         if (!organisateurRepository.existsById(organisateurId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Organisateur introuvable : " + organisateurId);
+            throw new ResourceNotFoundException("Organisateur introuvable : " + organisateurId);
         }
         return eventMapper.toResponseList(evenementRepository.findByOrganisateurIdOrderByDateDebutDesc(organisateurId));
     }
@@ -98,7 +106,7 @@ public class EventService {
 
         int totalCategories = totalBillets(evenement);
         if (dto.capacite() < totalCategories) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La capacite ne peut pas etre inferieure au total des categories de billets (" + totalCategories + ")");
+            throw new ValidationException("La capacite ne peut pas etre inferieure au total des categories de billets (" + totalCategories + ")");
         }
 
         eventMapper.updateEntity(dto, evenement);   // fills the existing managed entity
@@ -118,16 +126,16 @@ public class EventService {
         }
 
         if (evenement.getCategories().isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ajoutez au moins une categorie de billet avant de publier");
+            throw new ValidationException("Ajoutez au moins une categorie de billet avant de publier");
         }
 
         int total = totalBillets(evenement);
         if (total > evenement.getCapacite()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Le total des billets (" + total + ") depasse la capacite (" + evenement.getCapacite() + ")");
+            throw new ValidationException("Le total des billets (" + total + ") depasse la capacite (" + evenement.getCapacite() + ")");
         }
 
         if (!evenement.getDateClotureVente().isAfter(LocalDateTime.now())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La date de cloture des ventes est deja depassee");
+            throw new ValidationException("La date de cloture des ventes est deja depassee");
         }
 
         evenement.setStatut(StatutEvenement.PUBLIE);
@@ -144,7 +152,7 @@ public class EventService {
         }
 
         evenement.setStatut(StatutEvenement.ANNULE);
-        // TODO: cancel the pending reservations and create the refunds for paid ones
+        remboursementService.rembourserEvenementAnnule(evenement);   // 100% for every buyer
         return eventMapper.toResponse(evenement);
     }
 
@@ -164,7 +172,7 @@ public class EventService {
 
     // ---------- helpers ----------
     private Evenement findEvenement(Long id) {
-        return evenementRepository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Evenement introuvable : " + id));
+        return evenementRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Evenement introuvable : " + id));
     }
 
     private void verifierModifiable(Evenement evenement) {

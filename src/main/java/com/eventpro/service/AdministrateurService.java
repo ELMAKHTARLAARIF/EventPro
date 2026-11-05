@@ -2,6 +2,8 @@ package com.eventpro.service;
 
 import com.eventpro.dto.user.AdministrateurRegistrationDTO;
 import com.eventpro.entity.Administrateur;
+// EXCEPTION: our custom business exception (handled by GlobalExceptionHandler)
+import com.eventpro.exception.ValidationException;
 import com.eventpro.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -22,7 +24,7 @@ public class AdministrateurService {
     public Administrateur createAdministrateur(AdministrateurRegistrationDTO dto) {
 
         if (userRepository.existsByEmail(dto.email())) {
-            throw new IllegalArgumentException("Email already exists");
+            throw new ValidationException("Email already exists");
         }
 
         Administrateur administrateur = new Administrateur();

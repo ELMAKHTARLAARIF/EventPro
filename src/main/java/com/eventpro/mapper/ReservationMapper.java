@@ -17,8 +17,7 @@ public interface ReservationMapper {
     @Mapping(target = "clientId", source = "client.id")
     @Mapping(target = "codePromo", source = "promotion.code")
     @Mapping(target = "sousTotal", expression = "java(reservation.calculerTotal())")
-    @Mapping(target = "remise",
-            expression = "java(reservation.calculerTotal().subtract(reservation.getMontantTotal()))")
+    @Mapping(target = "remise", expression = "java(reservation.calculerTotal().subtract(reservation.getMontantTotal()))")
     ReservationResponseDTO toResponse(Reservation reservation);
 
     List<ReservationResponseDTO> toResponseList(List<Reservation> reservations);

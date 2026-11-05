@@ -7,6 +7,9 @@ import com.eventpro.dto.promotion.PromotionUpdateDTO;
 import com.eventpro.entity.Evenement;
 import com.eventpro.entity.Promotion;
 import com.eventpro.enums.StatutEvenement;
+// EXCEPTION: our custom business exceptions (handled by GlobalExceptionHandler)
+import com.eventpro.exception.ResourceNotFoundException;
+import com.eventpro.exception.ValidationException;
 import com.eventpro.mapper.PromotionMapper;
 import com.eventpro.repository.EvenementRepository;
 import com.eventpro.repository.PromotionRepository;
@@ -31,7 +34,6 @@ public class PromotionService {
         this.promotionMapper = promotionMapper;
     }
 
-    // ---------- CREATE ----------
     @Transactional
     public PromotionResponseDTO create(Long evenementId, PromotionRequestDTO dto) {
 
@@ -56,7 +58,6 @@ public class PromotionService {
         return promotionMapper.toResponse(promotionRepository.save(promotion));
     }
 
-    // ---------- READ ----------
     @Transactional(readOnly = true)
     public List<PromotionResponseDTO> findByEvenement(Long evenementId) {
         findEvenement(evenementId);
@@ -76,7 +77,7 @@ public class PromotionService {
 
     @Transactional(readOnly = true)
     public PromotionResponseDTO verifierCode(Long evenementId, String code) {
-        Promotion promotion = promotionRepository.findByCodeIgnoreCaseAndEvenementId(code.trim(), evenementId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Code promo inconnu pour cet evenement"));
+        Promotion promotion = promotionRepository.findByCodeIgnoreCaseAndEvenementId(code.trim(), evenementId).orElseThrow(() -> new ResourceNotFoundException("Code promo inconnu pour cet evenement"));
 
         if (!promotion.estUtilisable()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Ce code promo n'est plus valide (expire ou limite atteinte)");
@@ -94,7 +95,6 @@ public class PromotionService {
         return promotionMapper.toEvenementAvecPromotionsList(evenementRepository.findAllWithPromotions());
     }
 
-    // ---------- UPDATE ----------
     @Transactional
     public PromotionResponseDTO update(Long evenementId, Long promotionId, PromotionUpdateDTO dto) {
 
@@ -107,7 +107,7 @@ public class PromotionService {
         }
 
         if (dto.limiteUtilisation() < promotion.getNombreUtilisations()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La limite ne peut pas etre inferieure au nombre d'utilisations deja faites (" + promotion.getNombreUtilisations() + ")");
+            throw new ValidationException("La limite ne peut pas etre inferieure au nombre d'utilisations deja faites (" + promotion.getNombreUtilisations() + ")");
         }
 
         boolean dejaUtilisee = promotion.getNombreUtilisations() > 0;
@@ -122,11 +122,9 @@ public class PromotionService {
         // all checks passed: now copy the new values into the managed entity
         promotionMapper.updateEntity(dto, promotion);
 
-        // no save() needed: the entity is managed, Hibernate flushes the changes
         return promotionMapper.toResponse(promotion);
     }
 
-    // ---------- DELETE ----------
     @Transactional
     public void delete(Long evenementId, Long promotionId) {
 
@@ -141,16 +139,16 @@ public class PromotionService {
 
     // ---------- helpers ----------
     private Evenement findEvenement(Long evenementId) {
-        return evenementRepository.findById(evenementId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Evenement introuvable : " + evenementId));
+        return evenementRepository.findById(evenementId).orElseThrow(() -> new ResourceNotFoundException("Evenement introuvable : " + evenementId));
     }
 
     private Promotion findPromotion(Long evenementId, Long promotionId) {
-        return promotionRepository.findByIdAndEvenementId(promotionId, evenementId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Promotion " + promotionId + " introuvable pour l'evenement " + evenementId));
+        return promotionRepository.findByIdAndEvenementId(promotionId, evenementId).orElseThrow(() -> new ResourceNotFoundException("Promotion " + promotionId + " introuvable pour l'evenement " + evenementId));
     }
 
     private void checkFinDansEvenement(LocalDate dateFinPromo, Evenement evenement) {
         if (evenement.getDateFin() != null && dateFinPromo.isAfter(evenement.getDateFin().toLocalDate())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La promotion ne peut pas se terminer apres la fin de l'evenement");
+            throw new ValidationException("La promotion ne peut pas se terminer apres la fin de l'evenement");
         }
     }
 }

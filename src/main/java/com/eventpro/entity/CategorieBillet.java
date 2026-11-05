@@ -31,7 +31,7 @@ public class CategorieBillet {
     private int placesReservees = 0;
 
     @Column(nullable = false, columnDefinition = "integer default 0")
-    private int placesVendues = 0;
+    private int placesVendues = 0; // تذاكر مباعة
     
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "evenement_id")

@@ -5,13 +5,13 @@ import com.eventpro.entity.Billet;
 import com.eventpro.entity.LigneReservation;
 import com.eventpro.entity.Reservation;
 import com.eventpro.enums.StatutBillet;
+// EXCEPTION: our custom business exception (handled by GlobalExceptionHandler)
+import com.eventpro.exception.ResourceNotFoundException;
 import com.eventpro.mapper.TicketMapper;
 import com.eventpro.repository.BilletRepository;
 import com.eventpro.repository.ReservationRepository;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -55,7 +55,7 @@ public class TicketService {
     public List<TicketResponseDTO> findByReservation(Long reservationId) {
 
         if (!reservationRepository.existsById(reservationId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation introuvable : " + reservationId);
+            throw new ResourceNotFoundException("Reservation introuvable : " + reservationId);
         }
 
         return ticketMapper.toResponseList(billetRepository.findByLigneReservationReservationIdOrderById(reservationId));

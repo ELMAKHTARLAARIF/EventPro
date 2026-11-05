@@ -2,6 +2,8 @@ package com.eventpro.service;
 
 import com.eventpro.dto.user.OrganisateurRegistrationDTO;
 import com.eventpro.entity.Organisateur;
+// EXCEPTION: our custom business exception (handled by GlobalExceptionHandler)
+import com.eventpro.exception.ValidationException;
 import com.eventpro.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -22,7 +24,8 @@ public class OrganisateurService {
     public Organisateur registerOrganisateur(OrganisateurRegistrationDTO dto) {
 
         if (userRepository.existsByEmail(dto.email())) {
-            throw new IllegalArgumentException("Email already exists");
+
+            throw new ValidationException("Email already exists");
         }
 
         Organisateur organisateur = new Organisateur();

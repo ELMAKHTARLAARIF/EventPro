@@ -5,6 +5,8 @@ import com.eventpro.dto.Remboursement.RemboursementResponseDTO;
 import com.eventpro.entity.*;
 import com.eventpro.enums.StatutPaiement;
 import com.eventpro.enums.StatutReservation;
+// EXCEPTION: our custom business exception (handled by GlobalExceptionHandler)
+import com.eventpro.exception.ResourceNotFoundException;
 import com.eventpro.mapper.RemboursementMapper;
 import com.eventpro.repository.RemboursementRepository;
 import com.eventpro.repository.ReservationRepository;
@@ -40,7 +42,7 @@ public class RemboursementService {
     @Transactional
     public RemboursementResponseDTO demander(Long reservationId, RemboursementRequestDTO dto) {
 
-        Reservation reservation = reservationRepository.findByIdForUpdate(reservationId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation introuvable : " + reservationId));
+        Reservation reservation = reservationRepository.findByIdForUpdate(reservationId).orElseThrow(() -> new ResourceNotFoundException("Reservation introuvable : " + reservationId));
 
         if (reservation.getStatut() != StatutReservation.CONFIRMEE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Seule une reservation payee et confirmee peut etre remboursee");
@@ -83,18 +85,16 @@ public class RemboursementService {
         }
     }
 
-    // ---------- READ ----------
     @Transactional(readOnly = true)
     public List<RemboursementResponseDTO> findByReservation(Long reservationId) {
 
         if (!reservationRepository.existsById(reservationId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation introuvable : " + reservationId);
+            throw new ResourceNotFoundException("Reservation introuvable : " + reservationId);
         }
 
         return remboursementMapper.toResponseList(remboursementRepository.findByPaiementReservationIdOrderByDateDemandeDesc(reservationId));
     }
 
-    // ---------- helpers ----------
 
     // places sellable again, tickets cancelled, reservation refunded, refund approved
     private void appliquer(Reservation reservation, Remboursement remboursement) {

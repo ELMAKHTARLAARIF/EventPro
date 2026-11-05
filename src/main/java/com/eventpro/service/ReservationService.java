@@ -7,6 +7,11 @@ import com.eventpro.dto.reservation.ReservationUpdateDTO;
 import com.eventpro.entity.*;
 import com.eventpro.enums.StatutEvenement;
 import com.eventpro.enums.StatutReservation;
+// EXCEPTION: our custom business exceptions (see the exception package). They replace ResponseStatusException
+// when the cahier des charges has a dedicated exception for the situation.
+import com.eventpro.exception.ReservationExpiredException;
+import com.eventpro.exception.ResourceNotFoundException;
+import com.eventpro.exception.ValidationException;
 import com.eventpro.mapper.ReservationMapper;
 import com.eventpro.repository.ClientRepository;
 import com.eventpro.repository.EvenementRepository;
@@ -25,7 +30,7 @@ import java.util.*;
 @Service
 public class ReservationService {
 
-    private static final long DUREE_BLOCAGE_MINUTES = 10;   // cahier: 10 minutes
+    private static final long DUREE_BLOCAGE_MINUTES = 10;   // 10 minutes
 
     private static final List<StatutReservation> STATUTS_ACTIFS = List.of(StatutReservation.EN_ATTENTE, StatutReservation.CONFIRMEE);
 
@@ -33,35 +38,35 @@ public class ReservationService {
     private final EvenementRepository evenementRepository;
     private final ClientRepository clientRepository;
     private final PromotionRepository promotionRepository;
-    private final CategorieBilletService categorieService;
+    private final CategorieBilletService categorieBilletService;
     private final PaymentService paymentService;
     private final TicketService ticketService;
     private final ReservationMapper reservationMapper;
 
-    public ReservationService(ReservationRepository reservationRepository, EvenementRepository evenementRepository, ClientRepository clientRepository, PromotionRepository promotionRepository, CategorieBilletService categorieService, PaymentService paymentService, TicketService ticketService, ReservationMapper reservationMapper) {
+    public ReservationService(ReservationRepository reservationRepository, EvenementRepository evenementRepository, ClientRepository clientRepository, PromotionRepository promotionRepository, CategorieBilletService categorieBilletService, PaymentService paymentService, TicketService ticketService, ReservationMapper reservationMapper) {
         this.reservationRepository = reservationRepository;
         this.evenementRepository = evenementRepository;
         this.clientRepository = clientRepository;
         this.promotionRepository = promotionRepository;
-        this.categorieService = categorieService;
+        this.categorieBilletService = categorieBilletService;
         this.paymentService = paymentService;
         this.ticketService = ticketService;
         this.reservationMapper = reservationMapper;
     }
 
-    // ---------- CREATE ----------
     @Transactional
     public ReservationResponseDTO create(ReservationRequestDTO dto) {
 
-        Evenement evenement = evenementRepository.findById(dto.evenementId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Evenement introuvable : " + dto.evenementId()));
+        // EXCEPTION: "not found" -> ResourceNotFoundException (handled as HTTP 404 by GlobalExceptionHandler)
+        Evenement evenement = evenementRepository.findById(dto.evenementId()).orElseThrow(() -> new ResourceNotFoundException("Evenement introuvable : " + dto.evenementId()));
         verifierVentesOuvertes(evenement);
 
-        Client client = clientRepository.findById(dto.clientId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client introuvable : " + dto.clientId()));
+        Client client = clientRepository.findById(dto.clientId()).orElseThrow(() -> new ResourceNotFoundException("Client introuvable : " + dto.clientId()));
         if (!client.isActif()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ce compte est desactive");
         }
 
-        Map<Long, CategorieBillet> categories = categorieService.verrouiller(idsDe(dto.lignes()), evenement.getId());
+        Map<Long, CategorieBillet> categories = categorieBilletService.verrouiller(idsCategoryBillet(dto.lignes()), evenement.getId());
 
         Reservation reservation = new Reservation();
         reservation.setReference(genererReference());
@@ -80,28 +85,27 @@ public class ReservationService {
         return reservationMapper.toResponse(saved);
     }
 
-    // ---------- UPDATE ----------
     @Transactional
     public ReservationResponseDTO update(Long reservationId, ReservationUpdateDTO dto) {
 
-        Reservation reservation = reservationRepository.findByIdForUpdate(reservationId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reservation introuvable : " + reservationId));
+        Reservation reservation = reservationRepository.findByIdForUpdate(reservationId).orElseThrow(() -> new ResourceNotFoundException("Reservation introuvable : " + reservationId));
 
         if (reservation.getStatut() != StatutReservation.EN_ATTENTE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Seule une reservation en attente de paiement peut etre modifiee");
         }
         if (LocalDateTime.now().isAfter(reservation.getDateExpiration())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cette reservation a expire, creez-en une nouvelle");
+            throw new ReservationExpiredException("Cette reservation a expire, creez-en une nouvelle");
         }
 
         Evenement evenement = reservation.getEvenement();
         verifierVentesOuvertes(evenement);
 
-        Set<Long> ids = new LinkedHashSet<>(idsDe(dto.lignes()));
+        Set<Long> ids = new LinkedHashSet<>(idsCategoryBillet(dto.lignes()));
         reservation.getLignes().forEach(l -> ids.add(l.getCategorie().getId()));
-        Map<Long, CategorieBillet> categories = categorieService.verrouiller(ids, evenement.getId());
+        Map<Long, CategorieBillet> categories = categorieBilletService.verrouiller(ids, evenement.getId());
 
         for (LigneReservation ancienne : reservation.getLignes()) {
-            categorieService.libererPlaces(categories.get(ancienne.getCategorie().getId()), ancienne.getQuantite());
+            categorieBilletService.libererPlaces(categories.get(ancienne.getCategorie().getId()), ancienne.getQuantite());
         }
         libererPromotion(reservation);
         reservation.getLignes().clear();
@@ -112,12 +116,11 @@ public class ReservationService {
         return reservationMapper.toResponse(reservation);
     }
 
-    // ---------- READ ----------
     @Transactional(readOnly = true)
     public List<ReservationResponseDTO> findAllByEvenementId(Long evenementId) {
 
         if (!evenementRepository.existsById(evenementId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Evenement introuvable : " + evenementId);
+            throw new ResourceNotFoundException("Evenement introuvable : " + evenementId);
         }
 
         return reservationMapper.toResponseList(reservationRepository.findByEvenementIdOrderByDateCreationDesc(evenementId));
@@ -128,7 +131,7 @@ public class ReservationService {
         paymentService.creerPaiement(reservation);
 
         for (LigneReservation ligne : reservation.getLignes()) {
-            categorieService.confirmerVente(ligne.getCategorie(), ligne.getQuantite());
+            categorieBilletService.confirmerVente(ligne.getCategorie(), ligne.getQuantite());
         }
 
         ticketService.genererBillets(reservation);
@@ -136,7 +139,7 @@ public class ReservationService {
         reservation.setStatut(StatutReservation.CONFIRMEE);
     }
 
-    private List<Long> idsDe(List<LigneReservationRequestDTO> lignes) {
+    private List<Long> idsCategoryBillet(List<LigneReservationRequestDTO> lignes) {
         return lignes.stream().map(LigneReservationRequestDTO::categorieId).toList();
     }
 
@@ -149,16 +152,17 @@ public class ReservationService {
 
             CategorieBillet categorie = categories.get(l.categorieId());
             if (categorie == null) {
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "La categorie " + l.categorieId() + " n'appartient pas a cet evenement");
+                throw new ResourceNotFoundException("La categorie " + l.categorieId() + " n'appartient pas a cet evenement");
             }
             int quantite = l.quantite();
 
             long dejaReservee = reservationRepository.quantiteDejaReservee(clientId, categorie.getId(), STATUTS_ACTIFS, exclure);
             if (dejaReservee + quantite > categorie.getQuotaMaxParClient()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Quota depasse pour la categorie " + categorie.getNom() + " : maximum " + categorie.getQuotaMaxParClient() + " par client (vous en avez deja " + dejaReservee + " dans d'autres reservations)");
+                // EXCEPTION: wrong data sent by the client (quota) -> ValidationException (HTTP 400)
+                throw new ValidationException("Quota depasse pour la categorie " + categorie.getNom() + " : maximum " + categorie.getQuotaMaxParClient() + " par client (vous en avez deja " + dejaReservee + " dans d'autres reservations)");
             }
 
-            categorieService.reserverPlaces(categorie, quantite);
+            categorieBilletService.reserverPlaces(categorie, quantite);
 
             LigneReservation ligne = new LigneReservation();
             ligne.setCategorie(categorie);
@@ -175,7 +179,7 @@ public class ReservationService {
         BigDecimal remise = BigDecimal.ZERO;
 
         if (codePromo != null && !codePromo.isBlank()) {
-            Promotion promotion = promotionRepository.findWithLockByCodeIgnoreCaseAndEvenementId(codePromo.trim(), reservation.getEvenement().getId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Code promo inconnu pour cet evenement"));
+            Promotion promotion = promotionRepository.findWithLockByCodeIgnoreCaseAndEvenementId(codePromo.trim(), reservation.getEvenement().getId()).orElseThrow(() -> new ResourceNotFoundException("Code promo inconnu pour cet evenement"));
 
             if (!promotion.estUtilisable()) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Ce code promo n'est plus valide (expire ou limite atteinte)");
