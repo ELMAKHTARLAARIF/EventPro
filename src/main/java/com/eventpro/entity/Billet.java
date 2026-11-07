@@ -33,4 +33,18 @@ public class Billet {
 
     @OneToMany(mappedBy = "billet")
     private List<ControleBillet> controles = new ArrayList<>();
+
+    public boolean valider() {
+        return statut == StatutBillet.VALIDE;
+    }
+
+    // composts the ticket: VALIDE -> UTILISE, once only
+    public boolean controler() {
+        if (statut != StatutBillet.VALIDE) {
+            return false;
+        }
+        statut = StatutBillet.UTILISE;
+        dateControle = LocalDateTime.now();
+        return true;
+    }
 }
