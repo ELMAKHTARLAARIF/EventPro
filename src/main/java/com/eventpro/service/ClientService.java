@@ -1,38 +1,72 @@
 package com.eventpro.service;
 
-import com.eventpro.dto.user.ClientRegistrationDTO;
+import com.eventpro.dto.user.ClientRequestDTO;
+import com.eventpro.dto.user.ClientUpdateDTO;
+import com.eventpro.dto.user.UtilisateurResponseDTO;
 import com.eventpro.entity.Client;
-// EXCEPTION: our custom business exception (handled by GlobalExceptionHandler)
-import com.eventpro.exception.ValidationException;
-import com.eventpro.repository.UserRepository;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import com.eventpro.exception.ResourceNotFoundException;
+import com.eventpro.mapper.UtilisateurMapper;
+import com.eventpro.repository.ClientRepository;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 public class ClientService {
 
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final ClientRepository clientRepository;
+    private final UtilisateurService utilisateurService;
+    private final UtilisateurMapper utilisateurMapper;
 
-    public ClientService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
-        this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
+    public ClientService(ClientRepository clientRepository, UtilisateurService utilisateurService, UtilisateurMapper utilisateurMapper) {
+        this.clientRepository = clientRepository;
+        this.utilisateurService = utilisateurService;
+        this.utilisateurMapper = utilisateurMapper;
     }
 
+    // ---------- CREATE ----------
     @Transactional
-    public Client registerClient(ClientRegistrationDTO dto) {
+    public UtilisateurResponseDTO create(ClientRequestDTO dto) {
 
-        if (userRepository.existsByEmail(dto.email())) {
-            throw new ValidationException("Email already exists");
-        }
+        utilisateurService.verifierEmailLibre(dto.email());
 
-        Client client = new Client();
-        client.setNom(dto.nom());
-        client.setEmail(dto.email());
-        client.setMotDePasse(passwordEncoder.encode(dto.motDePasse()));
-        client.setTelephone(dto.telephone());
+        Client client = utilisateurMapper.toClient(dto);       // nom, email, telephone
+        client.setMotDePasse(utilisateurService.hasher(dto.motDePasse()));
+        utilisateurService.nettoyer(client);
 
-        return userRepository.save(client);
+        return utilisateurMapper.toResponse(clientRepository.save(client));
+    }
+
+    // ---------- READ ----------
+    @Transactional(readOnly = true)
+    public List<UtilisateurResponseDTO> findAll() {
+        return clientRepository.findAll(Sort.by("id")).stream().map(utilisateurMapper::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public UtilisateurResponseDTO findById(Long id) {
+        return utilisateurMapper.toResponse(findClient(id));
+    }
+
+    // ---------- UPDATE ----------
+    @Transactional
+    public UtilisateurResponseDTO update(Long id, ClientUpdateDTO dto) {
+
+        Client client = findClient(id);
+        utilisateurService.verifierEmailLibre(dto.email(), id);
+
+        utilisateurMapper.updateClient(dto, client);
+        utilisateurService.nettoyer(client);
+
+        // no save() needed: the entity is managed
+        return utilisateurMapper.toResponse(client);
+    }
+
+    // no delete: a client has reservations and tickets -> use UtilisateurService.changerActivation(id, false)
+
+    private Client findClient(Long id) {
+        return clientRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Client introuvable : " + id));
     }
 }

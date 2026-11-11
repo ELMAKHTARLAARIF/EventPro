@@ -23,7 +23,6 @@ public class Promotion {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // unique per event, not globally
     @Column(nullable = false, length = 30)
     private String code;
 

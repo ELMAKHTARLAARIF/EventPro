@@ -11,7 +11,6 @@ import java.util.*;
 @Table(name = "clients")
 @Getter @Setter @NoArgsConstructor
 public class Client extends User {
-//    Hibernate id — Primary key (PK) and foreign key (FK) because heritage form User 
     private String telephone;
 
 @OneToMany(mappedBy = "client")

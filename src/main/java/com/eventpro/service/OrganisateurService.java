@@ -1,39 +1,96 @@
 package com.eventpro.service;
 
-import com.eventpro.dto.user.OrganisateurRegistrationDTO;
+import com.eventpro.dto.user.OrganisateurRequestDTO;
+import com.eventpro.dto.user.OrganisateurUpdateDTO;
+import com.eventpro.dto.user.UtilisateurResponseDTO;
 import com.eventpro.entity.Organisateur;
-// EXCEPTION: our custom business exception (handled by GlobalExceptionHandler)
-import com.eventpro.exception.ValidationException;
-import com.eventpro.repository.UserRepository;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import com.eventpro.exception.ResourceNotFoundException;
+import com.eventpro.mapper.UtilisateurMapper;
+import com.eventpro.repository.EvenementRepository;
+import com.eventpro.repository.OrganisateurRepository;
+import com.eventpro.repository.PromotionRepository;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
 
 @Service
 public class OrganisateurService {
 
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final OrganisateurRepository organisateurRepository;
+    private final EvenementRepository evenementRepository;
+    private final PromotionRepository promotionRepository;
+    private final UtilisateurService utilisateurService;
+    private final UtilisateurMapper utilisateurMapper;
 
-    public OrganisateurService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
-        this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
+    public OrganisateurService(OrganisateurRepository organisateurRepository,
+                               EvenementRepository evenementRepository,
+                               PromotionRepository promotionRepository,
+                               UtilisateurService utilisateurService,
+                               UtilisateurMapper utilisateurMapper) {
+        this.organisateurRepository = organisateurRepository;
+        this.evenementRepository = evenementRepository;
+        this.promotionRepository = promotionRepository;
+        this.utilisateurService = utilisateurService;
+        this.utilisateurMapper = utilisateurMapper;
     }
 
     @Transactional
-    public Organisateur registerOrganisateur(OrganisateurRegistrationDTO dto) {
+    public UtilisateurResponseDTO create(OrganisateurRequestDTO dto) {
 
-        if (userRepository.existsByEmail(dto.email())) {
+        utilisateurService.verifierEmailLibre(dto.email());
 
-            throw new ValidationException("Email already exists");
+        Organisateur organisateur = utilisateurMapper.toOrganisateur(dto);     // nom, email
+        organisateur.setMotDePasse(utilisateurService.hasher(dto.motDePasse()));
+        utilisateurService.nettoyer(organisateur);
+
+        return utilisateurMapper.toResponse(organisateurRepository.save(organisateur));
+    }
+
+    @Transactional(readOnly = true)
+    public List<UtilisateurResponseDTO> findAll() {
+        return organisateurRepository.findAll(Sort.by("id")).stream()
+                .map(utilisateurMapper::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public UtilisateurResponseDTO findById(Long id) {
+        return utilisateurMapper.toResponse(findOrganisateur(id));
+    }
+
+    @Transactional
+    public UtilisateurResponseDTO update(Long id, OrganisateurUpdateDTO dto) {
+
+        Organisateur organisateur = findOrganisateur(id);
+        utilisateurService.verifierEmailLibre(dto.email(), id);
+
+        utilisateurMapper.updateOrganisateur(dto, organisateur);
+        utilisateurService.nettoyer(organisateur);
+
+        return utilisateurMapper.toResponse(organisateur);
+    }
+
+    @Transactional
+    public void delete(Long id) {
+
+        Organisateur organisateur = findOrganisateur(id);
+
+        if (evenementRepository.existsByOrganisateurId(id)
+                || promotionRepository.existsByOrganisateurId(id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Cet organisateur a des evenements ou des promotions : desactivez son compte au lieu de le supprimer");
         }
 
-        Organisateur organisateur = new Organisateur();
-        organisateur.setNom(dto.nom());
-        organisateur.setEmail(dto.email());
-        organisateur.setMotDePasse(passwordEncoder.encode(dto.motDePasse()));
-        organisateur.setNomOrganisation(dto.nomOrganisation());
+        organisateurRepository.delete(organisateur);
+    }
 
-        return userRepository.save(organisateur);
+    // ---------- helper ----------
+    private Organisateur findOrganisateur(Long id) {
+        return organisateurRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Organisateur introuvable : " + id));
     }
 }

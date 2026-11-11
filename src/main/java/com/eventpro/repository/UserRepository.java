@@ -3,11 +3,10 @@ package com.eventpro.repository;
 import com.eventpro.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.util.Optional;
-
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    Optional<User> findByEmail(String email);
+    boolean existsByEmailIgnoreCase(String email);
 
-    boolean existsByEmail(String email);
+    // used on update: the email may stay the same for the same account
+    boolean existsByEmailIgnoreCaseAndIdNot(String email, Long id);
 }

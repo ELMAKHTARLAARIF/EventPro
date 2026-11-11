@@ -12,8 +12,6 @@ import java.util.*;
 @Getter @Setter @NoArgsConstructor
 public class Organisateur extends User {
 
-    private String nomOrganisation;
-
     @OneToMany(mappedBy = "organisateur")
     private List<Evenement> evenements = new ArrayList<>();
 

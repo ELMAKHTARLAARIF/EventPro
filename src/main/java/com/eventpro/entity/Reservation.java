@@ -27,7 +27,6 @@ public class Reservation {
 
     private LocalDateTime dateCreation = LocalDateTime.now();
 
-    // dateCreation + 10 minutes (cahier des charges)
     private LocalDateTime dateExpiration;
 
     @Enumerated(EnumType.STRING)
@@ -44,7 +43,6 @@ public class Reservation {
     @JoinColumn(name = "evenement_id")
     private Evenement evenement;
 
-    // optional: a reservation may have no promo
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "promotion_id")
     private Promotion promotion;

@@ -48,6 +48,7 @@ dependencies {
 
     implementation 'org.mapstruct:mapstruct:1.6.3'
 
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2'
     // ORDER MATTERS: lombok first, then the binding, then mapstruct
     annotationProcessor 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'

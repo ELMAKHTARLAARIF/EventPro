@@ -22,7 +22,6 @@ public class TicketController {
 
     @GetMapping
     public ResponseEntity<List<TicketResponseDTO>> findByReservation(@PathVariable Long reservationId) {
-
         return ResponseEntity.ok(ticketService.findByReservation(reservationId));
     }
 }

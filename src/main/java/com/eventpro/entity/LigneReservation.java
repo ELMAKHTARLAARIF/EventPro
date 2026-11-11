@@ -18,7 +18,6 @@ public class LigneReservation {
 
     private int quantite;
 
-    // copied from CategorieBillet at booking time
     @Column(precision = 10, scale = 2)
     private BigDecimal prixUnitaire;
 

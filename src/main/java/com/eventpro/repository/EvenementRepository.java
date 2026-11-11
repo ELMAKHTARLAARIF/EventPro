@@ -39,4 +39,8 @@ public interface EvenementRepository extends JpaRepository<Evenement, Long> {
     List<Evenement> findEnVente(@Param("statut") StatutEvenement statut, @Param("now") LocalDateTime now);
 
     boolean existsByOrganisateurIdAndTitreIgnoreCaseAndDateDebut(Long organisateurId, String titre, LocalDateTime dateDebut);
+     @Query("""
+             select e.id from Evenement e where e.organisateur.id = :organisateurId
+             """)
+     boolean existsByOrganisateurId(@Param("organisateurId") Long organisateurId);
 }

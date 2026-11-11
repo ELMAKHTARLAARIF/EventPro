@@ -30,7 +30,7 @@ public class CheckInService {
     @Transactional
     public CheckInResponseDTO scanner(CheckInRequestDTO dto) {
 
-        // only an active agent can scan (until Spring Security gives the logged-in user)
+        // only an active agent can scan (the person standing at the entrance of the event)
         AgentControle agent = agentRepository.findById(dto.agentId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agent introuvable : " + dto.agentId()));
         if (!agent.isActif()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ce compte est desactive");

@@ -57,7 +57,6 @@ public class ReservationService {
     @Transactional
     public ReservationResponseDTO create(ReservationRequestDTO dto) {
 
-        // EXCEPTION: "not found" -> ResourceNotFoundException (handled as HTTP 404 by GlobalExceptionHandler)
         Evenement evenement = evenementRepository.findById(dto.evenementId()).orElseThrow(() -> new ResourceNotFoundException("Evenement introuvable : " + dto.evenementId()));
         verifierVentesOuvertes(evenement);
 
@@ -66,7 +65,7 @@ public class ReservationService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ce compte est desactive");
         }
 
-        Map<Long, CategorieBillet> categories = categorieBilletService.verrouiller(idsCategoryBillet(dto.lignes()), evenement.getId());
+        Map<Long, CategorieBillet> categories = categorieBilletService.verrouiller(idsCategoryBillet(dto.lignes()), evenement.getId()); //idsDe(dto.lignes()) extracts the category ids from the request: [1, 2].
 
         Reservation reservation = new Reservation();
         reservation.setReference(genererReference());
@@ -158,7 +157,6 @@ public class ReservationService {
 
             long dejaReservee = reservationRepository.quantiteDejaReservee(clientId, categorie.getId(), STATUTS_ACTIFS, exclure);
             if (dejaReservee + quantite > categorie.getQuotaMaxParClient()) {
-                // EXCEPTION: wrong data sent by the client (quota) -> ValidationException (HTTP 400)
                 throw new ValidationException("Quota depasse pour la categorie " + categorie.getNom() + " : maximum " + categorie.getQuotaMaxParClient() + " par client (vous en avez deja " + dejaReservee + " dans d'autres reservations)");
             }
 

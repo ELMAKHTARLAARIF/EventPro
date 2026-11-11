@@ -55,7 +55,7 @@ class ReservationServiceTest {
     ReservationMapper reservationMapper;
 
     @InjectMocks
-    ReservationService service;
+    ReservationService reservationService;
 
     private Evenement evenement;
     private Client client;
@@ -87,7 +87,7 @@ class ReservationServiceTest {
         aucuneReservationAnterieure(0L);
         sauvegardeRenvoieLArgument();
 
-        service.create(new ReservationRequestDTO(1L, 2L, List.of(ligne(1L, 3), ligne(2L, 2)), null));
+        reservationService.create(new ReservationRequestDTO(1L, 2L, List.of(ligne(1L, 3), ligne(2L, 2)), null));
 
         ArgumentCaptor<Reservation> captor = ArgumentCaptor.forClass(Reservation.class);
         verify(reservationRepository).save(captor.capture());
@@ -122,7 +122,7 @@ class ReservationServiceTest {
         Promotion promo = promotion(TypeReduction.POURCENTAGE, "20", 37, 100);
         when(promotionRepository.findWithLockByCodeIgnoreCaseAndEvenementId("SUMMER20", 1L)).thenReturn(Optional.of(promo));
 
-        service.create(new ReservationRequestDTO(1L, 2L, List.of(ligne(1L, 3), ligne(2L, 2)), "SUMMER20"));
+        reservationService.create(new ReservationRequestDTO(1L, 2L, List.of(ligne(1L, 3), ligne(2L, 2)), "SUMMER20"));
 
         ArgumentCaptor<Reservation> captor = ArgumentCaptor.forClass(Reservation.class);
         verify(reservationRepository).save(captor.capture());
@@ -135,14 +135,14 @@ class ReservationServiceTest {
 
     @Test
     void create_avecMontantFixe_neDepassePasLeSousTotal() {
-        evenementEtClientTrouves();
-        categoriesVerrouillees();
-        aucuneReservationAnterieure(0L);
-        sauvegardeRenvoieLArgument();
+        evenementEtClientTrouves();          //When the service searches for event ID 1, return the event/When the service searches for client ID 2, return the client.
+        categoriesVerrouillees();      //The helper probably configures the category service to return these categories when the reservation service requests them.
+        aucuneReservationAnterieure(0L);   //This prepares the repository to indicate that there are no previous reservations to consider.
+        sauvegardeRenvoieLArgument(); //This helper configures the mock repository's save() method to return the same reservation object it receives.
         Promotion promo = promotion(TypeReduction.MONTANT_FIXE, "100", 0, 100);
         when(promotionRepository.findWithLockByCodeIgnoreCaseAndEvenementId("SUMMER20", 1L)).thenReturn(Optional.of(promo));
 
-        service.create(new ReservationRequestDTO(1L, 2L, List.of(ligne(2L, 1)), "SUMMER20"));
+        reservationService.create(new ReservationRequestDTO(1L, 2L, List.of(ligne(2L, 1)), "SUMMER20"));
 
         ArgumentCaptor<Reservation> captor = ArgumentCaptor.forClass(Reservation.class);
         verify(reservationRepository).save(captor.capture());
@@ -154,7 +154,7 @@ class ReservationServiceTest {
     void create_evenementInconnu_404() {
         when(evenementRepository.findById(1L)).thenReturn(Optional.empty());
 
-        assertErreur(404, () -> service.create(requete(ligne(1L, 1))));
+        assertErreur(404, () -> reservationService.create(requete(ligne(1L, 1))));
 
         verifyNoInteractions(categorieService, paymentService, ticketService);
     }
@@ -164,7 +164,7 @@ class ReservationServiceTest {
         evenement.setStatut(StatutEvenement.BROUILLON);
         when(evenementRepository.findById(1L)).thenReturn(Optional.of(evenement));
 
-        assertErreur(409, () -> service.create(requete(ligne(1L, 1))));
+        assertErreur(409, () -> reservationService.create(requete(ligne(1L, 1))));
 
         verifyNoInteractions(categorieService, paymentService, ticketService);
     }
@@ -174,7 +174,7 @@ class ReservationServiceTest {
         evenement.setDateClotureVente(LocalDateTime.now().minusDays(1));
         when(evenementRepository.findById(1L)).thenReturn(Optional.of(evenement));
 
-        assertErreur(409, () -> service.create(requete(ligne(1L, 1))));
+        assertErreur(409, () -> reservationService.create(requete(ligne(1L, 1))));
     }
 
     @Test
@@ -182,7 +182,7 @@ class ReservationServiceTest {
         when(evenementRepository.findById(1L)).thenReturn(Optional.of(evenement));
         when(clientRepository.findById(2L)).thenReturn(Optional.empty());
 
-        assertErreur(404, () -> service.create(requete(ligne(1L, 1))));
+        assertErreur(404, () -> reservationService.create(requete(ligne(1L, 1))));
     }
 
     @Test
@@ -190,7 +190,7 @@ class ReservationServiceTest {
         client.setActif(false);
         evenementEtClientTrouves();
 
-        assertErreur(403, () -> service.create(requete(ligne(1L, 1))));
+        assertErreur(403, () -> reservationService.create(requete(ligne(1L, 1))));
 
         verifyNoInteractions(categorieService);
     }
@@ -201,7 +201,7 @@ class ReservationServiceTest {
         // the locked query only returns the categories of THIS event: category 2 is missing
         when(categorieService.verrouiller(anyCollection(), eq(1L))).thenReturn(Map.of(1L, vip));
 
-        assertErreur(404, () -> service.create(requete(ligne(2L, 1))));
+        assertErreur(404, () -> reservationService.create(requete(ligne(2L, 1))));
 
         verify(reservationRepository, never()).save(any());
     }
@@ -213,7 +213,7 @@ class ReservationServiceTest {
         // the client already holds 2 VIP, asks 3 more: 5 > quota of 4
         when(reservationRepository.quantiteDejaReservee(eq(2L), eq(1L), anyCollection(), eq(0L))).thenReturn(2L);
 
-        assertErreur(400, () -> service.create(requete(ligne(1L, 3))));
+        assertErreur(400, () -> reservationService.create(requete(ligne(1L, 3))));
 
         verify(categorieService, never()).reserverPlaces(any(), anyInt());
         verify(reservationRepository, never()).save(any());
@@ -227,7 +227,7 @@ class ReservationServiceTest {
         aucuneReservationAnterieure(0L);
         when(promotionRepository.findWithLockByCodeIgnoreCaseAndEvenementId("NOPE", 1L)).thenReturn(Optional.empty());
 
-        assertErreur(404, () -> service.create(new ReservationRequestDTO(1L, 2L, List.of(ligne(1L, 1)), "NOPE")));
+        assertErreur(404, () -> reservationService.create(new ReservationRequestDTO(1L, 2L, List.of(ligne(1L, 1)), "NOPE")));
 
         verify(reservationRepository, never()).save(any());
         verifyNoInteractions(paymentService, ticketService);
@@ -241,7 +241,7 @@ class ReservationServiceTest {
         Promotion epuisee = promotion(TypeReduction.POURCENTAGE, "20", 100, 100);   // 100 / 100 used
         when(promotionRepository.findWithLockByCodeIgnoreCaseAndEvenementId("SUMMER20", 1L)).thenReturn(Optional.of(epuisee));
 
-        assertErreur(409, () -> service.create(new ReservationRequestDTO(1L, 2L, List.of(ligne(1L, 1)), "SUMMER20")));
+        assertErreur(409, () -> reservationService.create(new ReservationRequestDTO(1L, 2L, List.of(ligne(1L, 1)), "SUMMER20")));
 
         assertEquals(100, epuisee.getNombreUtilisations());   // not incremented
         verify(reservationRepository, never()).save(any());
@@ -259,7 +259,7 @@ class ReservationServiceTest {
         categoriesVerrouillees();
         aucuneReservationAnterieure(10L);   // the reservation excludes ITSELF from the quota
 
-        service.update(10L, new ReservationUpdateDTO(List.of(ligne(1L, 2), ligne(2L, 1)), null));
+        reservationService.update(10L, new ReservationUpdateDTO(List.of(ligne(1L, 2), ligne(2L, 1)), null));
 
         verify(categorieService).libererPlaces(vip, 3);        // old line released
         verify(categorieService).reserverPlaces(vip, 2);       // new lines blocked
@@ -280,7 +280,7 @@ class ReservationServiceTest {
         categoriesVerrouillees();
         aucuneReservationAnterieure(10L);
 
-        service.update(10L, new ReservationUpdateDTO(List.of(ligne(2L, 2)), null));   // Standard only
+        reservationService.update(10L, new ReservationUpdateDTO(List.of(ligne(2L, 2)), null));   // Standard only
 
         // old category (1) AND new category (2) are locked together
         verify(categorieService).verrouiller(argThat(ids -> ids.containsAll(List.of(1L, 2L))), eq(1L));
@@ -300,7 +300,7 @@ class ReservationServiceTest {
         aucuneReservationAnterieure(10L);
         when(promotionRepository.findWithLockByCodeIgnoreCaseAndEvenementId("SUMMER20", 1L)).thenReturn(Optional.of(promo));
 
-        service.update(10L, new ReservationUpdateDTO(List.of(ligne(1L, 3)), null));
+        reservationService.update(10L, new ReservationUpdateDTO(List.of(ligne(1L, 3)), null));
 
         assertNull(reservation.getPromotion());
         assertEquals(37, promo.getNombreUtilisations());        // the use was given back
@@ -311,7 +311,7 @@ class ReservationServiceTest {
     void update_reservationInconnue_404() {
         when(reservationRepository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
 
-        assertErreur(404, () -> service.update(99L, new ReservationUpdateDTO(List.of(ligne(1L, 1)), null)));
+        assertErreur(404, () -> reservationService.update(99L, new ReservationUpdateDTO(List.of(ligne(1L, 1)), null)));
     }
 
     @Test
@@ -320,7 +320,7 @@ class ReservationServiceTest {
         reservation.setStatut(StatutReservation.CONFIRMEE);
         when(reservationRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(reservation));
 
-        assertErreur(409, () -> service.update(10L, new ReservationUpdateDTO(List.of(ligne(1L, 1)), null)));
+        assertErreur(409, () -> reservationService.update(10L, new ReservationUpdateDTO(List.of(ligne(1L, 1)), null)));
 
         verifyNoInteractions(categorieService);
     }
@@ -331,7 +331,7 @@ class ReservationServiceTest {
         reservation.setDateExpiration(LocalDateTime.now().minusMinutes(1));
         when(reservationRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(reservation));
 
-        assertErreur(409, () -> service.update(10L, new ReservationUpdateDTO(List.of(ligne(1L, 1)), null)));
+        assertErreur(409, () -> reservationService.update(10L, new ReservationUpdateDTO(List.of(ligne(1L, 1)), null)));
 
         verifyNoInteractions(categorieService);
     }
@@ -344,7 +344,7 @@ class ReservationServiceTest {
         // the client holds 3 VIP in OTHER reservations, asks 2 more: 5 > quota of 4
         when(reservationRepository.quantiteDejaReservee(eq(2L), eq(1L), anyCollection(), eq(10L))).thenReturn(3L);
 
-        assertErreur(400, () -> service.update(10L, new ReservationUpdateDTO(List.of(ligne(1L, 2)), null)));
+        assertErreur(400, () -> reservationService.update(10L, new ReservationUpdateDTO(List.of(ligne(1L, 2)), null)));
 
         verify(categorieService, never()).reserverPlaces(any(), anyInt());
         // in production the @Transactional rollback restores the released places

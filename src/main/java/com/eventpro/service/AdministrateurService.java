@@ -1,38 +1,35 @@
 package com.eventpro.service;
 
-import com.eventpro.dto.user.AdministrateurRegistrationDTO;
+import com.eventpro.dto.user.AdministrateurRequestDTO;
+import com.eventpro.dto.user.UtilisateurResponseDTO;
 import com.eventpro.entity.Administrateur;
-// EXCEPTION: our custom business exception (handled by GlobalExceptionHandler)
-import com.eventpro.exception.ValidationException;
-import com.eventpro.repository.UserRepository;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import com.eventpro.mapper.UtilisateurMapper;
+import com.eventpro.repository.AdministrateurRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AdministrateurService {
 
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final AdministrateurRepository administrateurRepository;
+    private final UtilisateurService utilisateurService;
+    private final UtilisateurMapper utilisateurMapper;
 
-    public AdministrateurService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
-        this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
+    public AdministrateurService(AdministrateurRepository administrateurRepository, UtilisateurService utilisateurService, UtilisateurMapper utilisateurMapper) {
+        this.administrateurRepository = administrateurRepository;
+        this.utilisateurService = utilisateurService;
+        this.utilisateurMapper = utilisateurMapper;
     }
 
     @Transactional
-    public Administrateur createAdministrateur(AdministrateurRegistrationDTO dto) {
+    public UtilisateurResponseDTO create(AdministrateurRequestDTO dto) {
 
-        if (userRepository.existsByEmail(dto.email())) {
-            throw new ValidationException("Email already exists");
-        }
+        utilisateurService.verifierEmailLibre(dto.email());
 
-        Administrateur administrateur = new Administrateur();
+        Administrateur administrateur = utilisateurMapper.toAdministrateur(dto);
+        administrateur.setMotDePasse(utilisateurService.hasher(dto.motDePasse()));
+        utilisateurService.nettoyer(administrateur);
 
-        administrateur.setNom(dto.nom());
-        administrateur.setEmail(dto.email());
-        administrateur.setMotDePasse(passwordEncoder.encode(dto.motDePasse()));
-
-        return userRepository.save(administrateur);
+        return utilisateurMapper.toResponse(administrateurRepository.save(administrateur));
     }
 }

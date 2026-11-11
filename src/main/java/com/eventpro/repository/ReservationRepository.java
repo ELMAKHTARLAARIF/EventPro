@@ -49,4 +49,8 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
             order by r.id
             """)
     List<Reservation> findByEvenementAndStatutForUpdate(@Param("evenementId") Long evenementId, @Param("statut") StatutReservation statut);
+   @Query("""
+           select r.id from Reservation r where r.client.id =:clientId
+           """)
+    boolean existsByClientId(@Param("clientId") Long clientId);
 }

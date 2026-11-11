@@ -15,9 +15,9 @@ public interface CategorieBilletRepository extends JpaRepository<CategorieBillet
 
     List<CategorieBillet> findByEvenementId(Long evenementId);
 
-    // makes sure the category belongs to this event
     Optional<CategorieBillet> findByIdAndEvenementId(Long id, Long evenementId);
 
+    @Query("SELECT c.id FROM CategorieBillet c WHERE UPPER(c.nom) = UPPER(:nom) AND c.evenement.id = :evenementId")
     boolean existsByNomIgnoreCaseAndEvenementId(String nom, Long evenementId);
 
     boolean existsByNomIgnoreCaseAndEvenementIdAndIdNot(String nom, Long evenementId, Long id);
@@ -29,10 +29,10 @@ public interface CategorieBilletRepository extends JpaRepository<CategorieBillet
     // SELECT ... FOR UPDATE: no other transaction can touch these rows until we commit
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
-        select c from CategorieBillet c
-        where c.id in :ids and c.evenement.id = :evenementId
-        order by c.id
-        """)
+            select c from CategorieBillet c
+            where c.id in :ids and c.evenement.id = :evenementId
+            order by c.id
+            """)
     List<CategorieBillet> findAllForUpdate(@Param("ids") Collection<Long> ids,
                                            @Param("evenementId") Long evenementId);
 }

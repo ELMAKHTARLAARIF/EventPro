@@ -1,11 +1,13 @@
 package com.eventpro.entity;
 
-import com.eventpro.enums.*;
+import com.eventpro.enums.StatutBillet;
 import jakarta.persistence.*;
-import lombok.*;
-import java.math.BigDecimal;
-import java.time.*;
-import java.util.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "billets")
@@ -31,9 +33,7 @@ public class Billet {
     @JoinColumn(name = "ligne_reservation_id")
     private LigneReservation ligneReservation;
 
-    @OneToMany(mappedBy = "billet")
-    private List<ControleBillet> controles = new ArrayList<>();
-
+    // is the ticket usable?
     public boolean valider() {
         return statut == StatutBillet.VALIDE;
     }

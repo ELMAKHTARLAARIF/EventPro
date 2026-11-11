@@ -41,15 +41,14 @@ public class CategorieBilletService {
     public CategorieBilletResponseDTO create(Long evenementId, CategorieBilletRequestDTO dto) {
 
         Evenement evenement = findEvenement(evenementId);
-        verifierModifiable(evenement);
-
+        verifierModifiable(evenement);   // if status termine or ANNULE can't modifiable
+          //if categorie already exist don't create it again
         if (categorieBilletRepository.existsByNomIgnoreCaseAndEvenementId(dto.nom().trim(), evenementId)) {
-            // EXCEPTION: generic 409 (duplicate): no dedicated exception, so ResponseStatusException stays
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cette categorie existe deja pour cet evenement");
         }
 
         long total = categorieBilletRepository.totalQuantite(evenementId) + dto.quantiteTotal();
-        verifierCapacite(evenement, total);
+        verifierCapacite(evenement, total);  // verifie if total billet <=  cpacite event
 
         CategorieBillet categorie = categorieMapper.toEntity(dto);
         categorie.setEvenement(evenement);
@@ -57,10 +56,9 @@ public class CategorieBilletService {
         return categorieMapper.toResponse(categorieBilletRepository.save(categorie));
     }
 
-    // ---------- READ ----------
     @Transactional(readOnly = true)
     public List<CategorieBilletResponseDTO> findByEvenement(Long evenementId) {
-        findEvenement(evenementId);
+        findEvenement(evenementId);       // many to one id evenment kanjib gae3 les categorie dyal evenement
         return categorieMapper.toResponseList(categorieBilletRepository.findByEvenementId(evenementId));
     }
 
@@ -83,7 +81,6 @@ public class CategorieBilletService {
 
         int utilisees = categorie.getPlacesReservees() + categorie.getPlacesVendues();
         if (dto.quantiteTotal() < utilisees) {
-            // EXCEPTION: invalid value sent by the client -> ValidationException (HTTP 400)
             throw new ValidationException("La quantite totale ne peut pas etre inferieure aux places deja reservees ou vendues (" + utilisees + ")");
         }
 
@@ -108,10 +105,6 @@ public class CategorieBilletService {
 
         categorieBilletRepository.delete(categorie);
     }
-
-    // ---------- STOCK (used by ReservationService) ----------
-
-    // SELECT ... FOR UPDATE: nobody else can change these categories until the commit
     @Transactional
     public Map<Long, CategorieBillet> verrouiller(Collection<Long> ids, Long evenementId) {
         return categorieBilletRepository.findAllForUpdate(ids, evenementId).stream().collect(Collectors.toMap(CategorieBillet::getId, Function.identity()));
@@ -142,7 +135,6 @@ public class CategorieBilletService {
 
     // ---------- helpers ----------
     private Evenement findEvenement(Long evenementId) {
-        // EXCEPTION: "not found" -> ResourceNotFoundException (HTTP 404)
         return evenementRepository.findById(evenementId).orElseThrow(() -> new ResourceNotFoundException("Evenement introuvable : " + evenementId));
     }
 

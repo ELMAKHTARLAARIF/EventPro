@@ -13,6 +13,7 @@ import com.eventpro.mapper.EventMapper;
 import com.eventpro.repository.EvenementRepository;
 import com.eventpro.repository.OrganisateurRepository;
 import com.eventpro.repository.PromotionRepository;
+import com.eventpro.repository.UserRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -31,25 +32,25 @@ public class EventService {
     private final PromotionRepository promotionRepository;
     private final EventMapper eventMapper;
     private final RemboursementService remboursementService;
+    private final UserRepository userRepository;
 
 
-    public EventService(EvenementRepository evenementRepository, OrganisateurRepository organisateurRepository, PromotionRepository promotionRepository, EventMapper eventMapper, RemboursementService remboursementService) {
+    public EventService(EvenementRepository evenementRepository, OrganisateurRepository organisateurRepository, PromotionRepository promotionRepository, EventMapper eventMapper, RemboursementService remboursementService, UserRepository userRepository) {
         this.evenementRepository = evenementRepository;
         this.organisateurRepository = organisateurRepository;
         this.promotionRepository = promotionRepository;
         this.eventMapper = eventMapper;
         this.remboursementService = remboursementService;
+        this.userRepository = userRepository;
     }
 
     @Transactional
     public EventResponseDTO create(EventRequestDTO dto) {
 
         if (dto.organisateurId() == null) {
-            // EXCEPTION: missing/wrong data -> ValidationException (HTTP 400)
             throw new ValidationException("L'organisateur est obligatoire");
         }
 
-        // EXCEPTION: "not found" -> ResourceNotFoundException (HTTP 404)
         Organisateur organisateur = organisateurRepository.findById(dto.organisateurId()).orElseThrow(() -> new ResourceNotFoundException("Organisateur introuvable : " + dto.organisateurId()));
 
         if (dto.dateDebut().isBefore(LocalDateTime.now())) {
@@ -57,7 +58,6 @@ public class EventService {
         }
 
         if (evenementRepository.existsByOrganisateurIdAndTitreIgnoreCaseAndDateDebut(organisateur.getId(), dto.titre().trim(), dto.dateDebut())) {
-            // EXCEPTION: generic 409 (duplicate): no dedicated exception, so ResponseStatusException stays
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Vous avez deja un evenement avec ce titre a cette date");
         }
 
@@ -109,10 +109,9 @@ public class EventService {
             throw new ValidationException("La capacite ne peut pas etre inferieure au total des categories de billets (" + totalCategories + ")");
         }
 
-        eventMapper.updateEntity(dto, evenement);   // fills the existing managed entity
+        eventMapper.updateEntity(dto, evenement);
         nettoyer(evenement);
 
-        // no save() needed: the entity is managed, Hibernate flushes the changes
         return eventMapper.toResponse(evenement);
     }
 
@@ -161,7 +160,6 @@ public class EventService {
 
         Evenement evenement = findEvenement(id);
 
-        // a draft has no reservation and no ticket yet, so it is safe to remove
         if (evenement.getStatut() != StatutEvenement.BROUILLON) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Seul un evenement en brouillon peut etre supprime. " + "Pour un evenement publie, utilisez l'annulation.");
         }
@@ -190,4 +188,5 @@ public class EventService {
         e.setTitre(e.getTitre().trim());
         e.setLieu(e.getLieu().trim());
     }
+
 }

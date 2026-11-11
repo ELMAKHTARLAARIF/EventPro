@@ -38,4 +38,9 @@ public interface PromotionRepository extends JpaRepository<Promotion, Long> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Promotion> findWithLockByCodeIgnoreCaseAndEvenementId(String code, Long evenementId);
+
+    @Query("""
+            select p.id from Promotion p where p.organisateur.id = :organisateurId
+            """)
+    boolean existsByOrganisateurId(@Param("organisateurId") Long organisateurId);
 }
