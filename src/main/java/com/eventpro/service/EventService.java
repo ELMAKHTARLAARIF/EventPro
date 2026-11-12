@@ -16,6 +16,7 @@ import com.eventpro.repository.PromotionRepository;
 import com.eventpro.repository.UserRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,7 +33,6 @@ public class EventService {
     private final PromotionRepository promotionRepository;
     private final EventMapper eventMapper;
     private final RemboursementService remboursementService;
-    private final UserRepository userRepository;
 
 
     public EventService(EvenementRepository evenementRepository, OrganisateurRepository organisateurRepository, PromotionRepository promotionRepository, EventMapper eventMapper, RemboursementService remboursementService, UserRepository userRepository) {
@@ -41,7 +41,6 @@ public class EventService {
         this.promotionRepository = promotionRepository;
         this.eventMapper = eventMapper;
         this.remboursementService = remboursementService;
-        this.userRepository = userRepository;
     }
 
     @Transactional
@@ -70,9 +69,8 @@ public class EventService {
     }
 
     @Transactional(readOnly = true)
-    public Page<EventResponseDTO> search(StatutEvenement statut, String q, Pageable pageable) {
-        String keyword = (q == null) ? "" : q.trim();
-        return evenementRepository.search(statut, keyword, pageable).map(eventMapper::toResponse);
+    public List<EventResponseDTO> findAll() {
+        return eventMapper.toResponseList(evenementRepository.findAll(Sort.by("dateDebut")));
     }
 
     @Transactional(readOnly = true)

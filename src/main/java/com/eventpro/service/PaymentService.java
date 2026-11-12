@@ -41,7 +41,6 @@ public class PaymentService {
         return paiement;
     }
 
-    // ---------- READ ----------
     @Transactional(readOnly = true)
     public PaymentResponseDTO findByReservation(Long reservationId) {
         return paiementRepository.findByReservationId(reservationId).map(paymentMapper::toResponse).orElseThrow(() -> new ResourceNotFoundException("Aucun paiement pour la reservation " + reservationId));

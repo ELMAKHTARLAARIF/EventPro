@@ -36,7 +36,6 @@ public class CategorieBilletService {
         this.categorieMapper = categorieMapper;
     }
 
-    // ---------- CREATE ----------
     @Transactional
     public CategorieBilletResponseDTO create(Long evenementId, CategorieBilletRequestDTO dto) {
 
@@ -67,7 +66,6 @@ public class CategorieBilletService {
         return categorieMapper.toResponse(findCategorie(evenementId, categorieId));
     }
 
-    // ---------- UPDATE ----------
     @Transactional
     public CategorieBilletResponseDTO update(Long evenementId, Long categorieId, CategorieBilletRequestDTO dto) {
 
@@ -89,11 +87,9 @@ public class CategorieBilletService {
 
         categorieMapper.updateEntity(dto, categorie);
 
-        // no save() needed: the entity is managed
         return categorieMapper.toResponse(categorie);
     }
 
-    // ---------- DELETE ----------
     @Transactional
     public void delete(Long evenementId, Long categorieId) {
 
@@ -114,7 +110,6 @@ public class CategorieBilletService {
     @Transactional
     public void reserverPlaces(CategorieBillet categorie, int quantite) {
         if (quantite > categorie.placesDisponibles()) {
-            // EXCEPTION: not enough free places -> InsufficientStockException (HTTP 409)
             throw new InsufficientStockException("Stock insuffisant pour la categorie " + categorie.getNom() + " : " + categorie.placesDisponibles() + " place(s) disponible(s)");
         }
         categorie.setPlacesReservees(categorie.getPlacesReservees() + quantite);

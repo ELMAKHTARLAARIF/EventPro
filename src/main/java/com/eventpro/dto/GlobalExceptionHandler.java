@@ -25,7 +25,6 @@ public class GlobalExceptionHandler {
 
 //    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class); // @Slf4j annotation
 
-    // ---------- 400 ----------
     @ExceptionHandler(ValidationException.class)
     public ResponseEntity<ErrorResponse> handleValidation(ValidationException ex, HttpServletRequest req) {
         return build(HttpStatus.BAD_REQUEST, ex.getMessage(), req, null);
@@ -50,26 +49,22 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, "Requete mal formee", req, null);
     }
 
-    // ---------- 404 ----------
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException ex, HttpServletRequest req) {
         return build(HttpStatus.NOT_FOUND, ex.getMessage(), req, null);
     }
 
-    // ---------- 409 ----------
     @ExceptionHandler({InsufficientStockException.class, TicketAlreadyUsedException.class, IdempotencyConflictException.class, ReservationExpiredException.class})
     public ResponseEntity<ErrorResponse> handleConflict(RuntimeException ex, HttpServletRequest req) {
         return build(HttpStatus.CONFLICT, ex.getMessage(), req, null);
     }
 
-    // ---------- Compatibilite avec le code existant (ResponseStatusException) ----------
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ErrorResponse> handleResponseStatus(ResponseStatusException ex, HttpServletRequest req) {
         HttpStatusCode code = ex.getStatusCode();
         return build(code, ex.getReason(), req, null);
     }
 
-    // ---------- 500 ----------
     @ExceptionHandler(SystemException.class)
     public ResponseEntity<ErrorResponse> handleSystem(SystemException ex, HttpServletRequest req) {
         log.error("Erreur systeme sur {}", req.getRequestURI(), ex);

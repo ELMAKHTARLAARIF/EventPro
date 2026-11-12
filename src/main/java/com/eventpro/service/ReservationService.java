@@ -89,9 +89,9 @@ public class ReservationService {
 
         Reservation reservation = reservationRepository.findByIdForUpdate(reservationId).orElseThrow(() -> new ResourceNotFoundException("Reservation introuvable : " + reservationId));
 
-        if (reservation.getStatut() != StatutReservation.EN_ATTENTE) {
+/*        if (reservation.getStatut() != StatutReservation.EN_ATTENTE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Seule une reservation en attente de paiement peut etre modifiee");
-        }
+        }*/
         if (LocalDateTime.now().isAfter(reservation.getDateExpiration())) {
             throw new ReservationExpiredException("Cette reservation a expire, creez-en une nouvelle");
         }
@@ -145,8 +145,6 @@ public class ReservationService {
     private void ajouterLignes(Reservation reservation, List<LigneReservationRequestDTO> lignes, Map<Long, CategorieBillet> categories) {
 
         Long clientId = reservation.getClient().getId();
-        Long exclure = reservation.getId() == null ? 0L : reservation.getId();
-
         for (LigneReservationRequestDTO l : lignes) {
 
             CategorieBillet categorie = categories.get(l.categorieId());
@@ -155,7 +153,7 @@ public class ReservationService {
             }
             int quantite = l.quantite();
 
-            long dejaReservee = reservationRepository.quantiteDejaReservee(clientId, categorie.getId(), STATUTS_ACTIFS, exclure);
+            long dejaReservee = reservationRepository.quantiteDejaReservee(clientId, categorie.getId(), STATUTS_ACTIFS);
             if (dejaReservee + quantite > categorie.getQuotaMaxParClient()) {
                 throw new ValidationException("Quota depasse pour la categorie " + categorie.getNom() + " : maximum " + categorie.getQuotaMaxParClient() + " par client (vous en avez deja " + dejaReservee + " dans d'autres reservations)");
             }

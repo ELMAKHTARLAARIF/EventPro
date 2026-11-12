@@ -29,11 +29,9 @@ public class EventController {
     }
 
     @GetMapping("/evenements")
-    public ResponseEntity<Page<EventResponseDTO>> search(@RequestParam(required = false) StatutEvenement statut, @RequestParam(required = false) String q, @PageableDefault(size = 10, sort = "dateDebut") Pageable pageable) {
-
-        return ResponseEntity.ok(eventService.search(statut, q, pageable));
+    public ResponseEntity<List<EventResponseDTO>> findAll() {
+        return ResponseEntity.ok(eventService.findAll());
     }
-
 
     @GetMapping("/evenements/{id}")
     public ResponseEntity<EventResponseDTO> findById(@PathVariable Long id) {
