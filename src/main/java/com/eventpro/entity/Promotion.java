@@ -57,6 +57,6 @@ public class Promotion {
    // need explaination
     public BigDecimal calculerReduction(BigDecimal sousTotal) {
         BigDecimal remise = (typeReduction == TypeReduction.POURCENTAGE) ? sousTotal.multiply(valeurReduction).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP) : valeurReduction;
-        return remise.min(sousTotal);
+        return remise.min(sousTotal);  //returns the discount amount
     }
 }

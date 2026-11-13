@@ -9,6 +9,7 @@ import com.eventpro.enums.StatutEvenement;
 import com.eventpro.enums.StatutReservation;
 // EXCEPTION: our custom business exceptions (see the exception package). They replace ResponseStatusException
 // when the cahier des charges has a dedicated exception for the situation.
+import com.eventpro.exception.AucuneReservationTrouveeException;
 import com.eventpro.exception.ReservationExpiredException;
 import com.eventpro.exception.ResourceNotFoundException;
 import com.eventpro.exception.ValidationException;
@@ -89,9 +90,9 @@ public class ReservationService {
 
         Reservation reservation = reservationRepository.findByIdForUpdate(reservationId).orElseThrow(() -> new ResourceNotFoundException("Reservation introuvable : " + reservationId));
 
-/*        if (reservation.getStatut() != StatutReservation.EN_ATTENTE) {
+        if (reservation.getStatut() != StatutReservation.EN_ATTENTE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Seule une reservation en attente de paiement peut etre modifiee");
-        }*/
+        }
         if (LocalDateTime.now().isAfter(reservation.getDateExpiration())) {
             throw new ReservationExpiredException("Cette reservation a expire, creez-en une nouvelle");
         }
@@ -203,12 +204,27 @@ public class ReservationService {
         if (evenement.getStatut() != StatutEvenement.PUBLIE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cet evenement n'est pas ouvert a la reservation");
         }
-        if (now.isBefore(evenement.getDateOuvertureVente()) || now.isAfter(evenement.getDateClotureVente())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Les ventes ne sont pas ouvertes pour cet evenement");
-        }
+//        if (now.isBefore(evenement.getDateOuvertureVente()) || now.isAfter(evenement.getDateClotureVente())) {
+//            throw new ResponseStatusException(HttpStatus.CONFLICT, "Les ventes ne sont pas ouvertes pour cet evenement");
+//        }
     }
 
     private String genererReference() {
         return "RES-" + Year.now().getValue() + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+    }
+
+
+    // Misse en Situation
+
+    public List<ReservationResponseDTO> getClientWithReservationSConfirme(Long evevementId,StatutReservation statutReservation, String email, String nomCategorie, Long quantiteMin) {
+
+        if (!reservationRepository.existsById(evevementId)) {
+            throw new ResourceNotFoundException("evenement id " + evevementId + " n'existe pas");
+        }
+        if (email == null || email.isBlank() && (nomCategorie == null || nomCategorie.isBlank()) && statutReservation != StatutReservation.CONFIRMEE || quantiteMin == null || quantiteMin <= 0) {
+            throw new AucuneReservationTrouveeException("Aucune Reservation Trouvee");
+        }
+        return reservationMapper.toResponseList(reservationRepository.findClientsWithReservationConfirmeeAndCategorieBilletName(evevementId,statutReservation, email, nomCategorie,quantiteMin));
+
     }
 }

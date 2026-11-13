@@ -1,5 +1,6 @@
 package com.eventpro.repository;
 
+import com.eventpro.entity.Client;
 import com.eventpro.entity.Reservation;
 import com.eventpro.enums.StatutReservation;
 import jakarta.persistence.LockModeType;
@@ -49,5 +50,24 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
             order by r.id
             """)
     List<Reservation> findByEvenementAndStatutForUpdate(@Param("evenementId") Long evenementId, @Param("statut") StatutReservation statut);
-    
+
+   // Misse en Situation
+    @Query("""
+                SELECT DISTINCT c FROM Client c
+                JOIN Reservation r ON r.client.id = c.id
+                JOIN LigneReservation l ON l.reservation.id = r.id
+                JOIN CategorieBillet cb ON l.categorie.id = cb.id
+                WHERE r.statut = :statut
+                AND r.evenement.id = :evenementId
+                AND c.email = :email
+                AND cb.nom = :nom
+                AND cb.quantiteTotal >= :quantiteMin
+            """)
+    List<Reservation> findClientsWithReservationConfirmeeAndCategorieBilletName(
+            @Param("evenementId") Long evenementId,
+            @Param("statut") StatutReservation statutReservation,
+            @Param("email") String email,
+            @Param("nom") String nom,
+            @Param("quantiteMin") Long quantiteMin
+    );
 }

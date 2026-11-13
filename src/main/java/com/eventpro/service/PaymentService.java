@@ -33,6 +33,7 @@ public class PaymentService {
         paiement.setReference("PAY-" + Year.now().getValue() + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
         paiement.setMontant(reservation.getMontantTotal());
         paiement.setDatePaiement(LocalDateTime.now());
+        paiement.setCleIdempotence("ABCDEFG");
         paiement.setStatut(StatutPaiement.REUSSI);
         paiement.setReservation(reservation);
 

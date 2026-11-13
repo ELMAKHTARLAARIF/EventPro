@@ -41,7 +41,7 @@ public class CategorieBilletService {
 
         Evenement evenement = findEvenement(evenementId);
         verifierModifiable(evenement);   // if status termine or ANNULE can't modifiable
-          //if categorie already exist don't create it again
+//          if categorie already exist don't create it again
         if (categorieBilletRepository.existsByNomIgnoreCaseAndEvenementId(dto.nom().trim(), evenementId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cette categorie existe deja pour cet evenement");
         }

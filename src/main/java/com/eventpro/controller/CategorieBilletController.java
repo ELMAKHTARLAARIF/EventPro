@@ -25,11 +25,11 @@ public class CategorieBilletController {
         return ResponseEntity.status(201).body(categorieService.create(evenementId, dto));
     }
     @GetMapping
-    public ResponseEntity<List<CategorieBilletResponseDTO>> findByEvenement(@PathVariable Long evenementId, @Valid @RequestBody CategorieBilletRequestDTO dto) {
+    public ResponseEntity<List<CategorieBilletResponseDTO>> findByEvenement(@PathVariable Long evenementId) {
         return ResponseEntity.ok(categorieService.findByEvenement(evenementId));
     }
     @GetMapping("/{categorieId}")
-    public ResponseEntity<CategorieBilletResponseDTO> findOne(@PathVariable Long evenementId, @PathVariable Long categoryBilletId, @Valid @RequestBody CategorieBilletRequestDTO dto) {
+    public ResponseEntity<CategorieBilletResponseDTO> findOne(@PathVariable Long evenementId, @PathVariable Long categoryBilletId) {
         return ResponseEntity.ok(categorieService.findOne(evenementId, categoryBilletId));
     }
     @PutMapping("/{categorieId}")

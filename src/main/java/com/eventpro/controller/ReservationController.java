@@ -3,6 +3,7 @@ package com.eventpro.controller;
 import com.eventpro.dto.reservation.ReservationRequestDTO;
 import com.eventpro.dto.reservation.ReservationResponseDTO;
 import com.eventpro.dto.reservation.ReservationUpdateDTO;
+import com.eventpro.enums.StatutReservation;
 import com.eventpro.service.ReservationService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -38,5 +39,13 @@ public class ReservationController {
             @Valid @RequestBody ReservationUpdateDTO dto) {
 
         return ResponseEntity.ok(reservationService.update(id, dto));
+    }
+
+
+    // Misse en Situation (reservationService -> reservationRepository )
+    @GetMapping("/api/v1/reservations/recherche")
+    public ResponseEntity<List<ReservationResponseDTO>> findClientsWithReservationConfirme(@PathVariable("evenementId") Long evenementId, @RequestParam StatutReservation statutReservation, String email,String nomCategorie,Long quantiteMin) {
+
+        return ResponseEntity.ok(reservationService.getClientWithReservationSConfirme(evenementId,statutReservation,email,nomCategorie,quantiteMin));
     }
 }

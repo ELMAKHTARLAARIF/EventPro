@@ -1,3 +1,4 @@
+
 plugins {
     id 'java'
     id 'war'
@@ -33,30 +34,36 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.springframework.modulith:spring-modulith-starter-core'
+
     compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
     developmentOnly 'org.springframework.boot:spring-boot-docker-compose'
-    annotationProcessor 'org.projectlombok:lombok'
+
     annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+
     providedRuntime 'org.springframework.boot:spring-boot-starter-tomcat-runtime'
+
     testImplementation 'org.springframework.boot:spring-boot-starter-thymeleaf-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
     testImplementation 'org.springframework.modulith:spring-modulith-starter-test'
+
     testCompileOnly 'org.projectlombok:lombok'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testAnnotationProcessor 'org.projectlombok:lombok'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     runtimeOnly 'org.postgresql:postgresql'
+
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.security:spring-security-crypto'
 
     implementation 'org.mapstruct:mapstruct:1.6.3'
-
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2'
-    annotationProcessor 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
     annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
-    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2'
 
     testRuntimeOnly 'com.h2database:h2'
 }
@@ -73,10 +80,15 @@ generateJava {
     generateClient = true
 }
 
+// ==================== TESTS ====================
+
 tasks.named('test') {
     useJUnitPlatform()
-    finalizedBy 'jacocoTestReport'
+    finalizedBy tasks.named('jacocoTestReport')
 }
+
+// ==================== JACOCO ====================
+
 jacoco {
     toolVersion = '0.8.12'
 }
@@ -91,31 +103,31 @@ def coverageExclusions = [
 ]
 
 tasks.named('jacocoTestReport') {
-    dependsOn tasks.named('test')
     reports {
-        xml.required = true    // needed by SonarQube
-        html.required = true   // published by Jenkins
+        xml.required = true
+        html.required = true
     }
-    afterEvaluate {
-        classDirectories.setFrom(files(classDirectories.files.collect {
-            fileTree(dir: it, exclude: coverageExclusions)
-        }))
-    }
+
+    classDirectories.setFrom(
+            files(sourceSets.main.output.classesDirs.collect {
+                fileTree(dir: it, exclude: coverageExclusions)
+            })
+    )
 }
 
 tasks.named('jacocoTestCoverageVerification') {
-    dependsOn tasks.named('jacocoTestReport')
-    afterEvaluate {
-        classDirectories.setFrom(files(classDirectories.files.collect {
-            fileTree(dir: it, exclude: coverageExclusions)
-        }))
-    }
+    classDirectories.setFrom(
+            files(sourceSets.main.output.classesDirs.collect {
+                fileTree(dir: it, exclude: coverageExclusions)
+            })
+    )
+
     violationRules {
         rule {
             limit {
                 counter = 'LINE'
                 value = 'COVEREDRATIO'
-                minimum = 0.80      // global coverage >= 80%
+                minimum = 0.80
             }
         }
     }
@@ -124,5 +136,3 @@ tasks.named('jacocoTestCoverageVerification') {
 tasks.named('check') {
     dependsOn tasks.named('jacocoTestCoverageVerification')
 }
-
-// =====================

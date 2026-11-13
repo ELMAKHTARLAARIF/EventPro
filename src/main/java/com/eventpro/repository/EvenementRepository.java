@@ -31,5 +31,7 @@ public interface EvenementRepository extends JpaRepository<Evenement, Long> {
     boolean existsByOrganisateurId(Long organisateurId);
 
 
+    boolean existsById(Long id);
+
 
 }

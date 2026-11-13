@@ -77,6 +77,12 @@ public class GlobalExceptionHandler {
         return internalError(req);
     }
 
+
+    // Misse en Situation 
+    @ExceptionHandler(AucuneReservationTrouveeException.class)
+    private  ResponseEntity<ErrorResponse> HandleNotFound(AucuneReservationTrouveeException ex, HttpServletRequest req) {
+               return build(HttpStatus.NOT_FOUND, ex.getMessage(), req, null);
+    }
     // ---------- Helpers ----------
     private ResponseEntity<ErrorResponse> internalError(HttpServletRequest req) {
         // Message generique : ne jamais devoiler le code source
@@ -88,4 +94,6 @@ public class GlobalExceptionHandler {
         ErrorResponse body = ErrorResponse.builder().timestamp(LocalDateTime.now()).status(status.value()).error(status.getReasonPhrase()).message(message).path(req.getRequestURI()).fieldErrors(fieldErrors).build();
         return ResponseEntity.status(status).body(body);
     }
+
+
 }

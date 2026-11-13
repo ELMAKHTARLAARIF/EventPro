@@ -211,7 +211,7 @@ class ReservationServiceTest {
         evenementEtClientTrouves();
         categoriesVerrouillees();
         // the client already holds 2 VIP, asks 3 more: 5 > quota of 4
-        when(reservationRepository.quantiteDejaReservee(eq(2L), eq(1L), anyCollection(), eq(0L))).thenReturn(2L);
+        when(reservationRepository.quantiteDejaReservee(eq(2L), eq(1L), anyCollection())).thenReturn(2L);
 
         assertErreur(400, () -> reservationService.create(requete(ligne(1L, 3))));
 
@@ -342,7 +342,7 @@ class ReservationServiceTest {
         when(reservationRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(reservation));
         categoriesVerrouillees();
         // the client holds 3 VIP in OTHER reservations, asks 2 more: 5 > quota of 4
-        when(reservationRepository.quantiteDejaReservee(eq(2L), eq(1L), anyCollection(), eq(10L))).thenReturn(3L);
+        when(reservationRepository.quantiteDejaReservee(eq(2L), eq(1L), anyCollection())).thenReturn(3L);
 
         assertErreur(400, () -> reservationService.update(10L, new ReservationUpdateDTO(List.of(ligne(1L, 2)), null)));
 
@@ -361,9 +361,10 @@ class ReservationServiceTest {
         when(categorieService.verrouiller(anyCollection(), eq(1L))).thenReturn(Map.of(1L, vip, 2L, standard));
     }
 
-    // "exclure" = id of the reservation ignored by the quota query (0 when creating)
+    // Stubs the same 3-argument quota query that ReservationService actually calls.
+    // The current service method does not pass a reservation ID to exclude.
     private void aucuneReservationAnterieure(Long exclure) {
-        when(reservationRepository.quantiteDejaReservee(eq(2L), anyLong(), anyCollection(), eq(exclure))).thenReturn(0L);
+        when(reservationRepository.quantiteDejaReservee(eq(2L), anyLong(), anyCollection())).thenReturn(0L);
     }
 
     private void sauvegardeRenvoieLArgument() {
@@ -430,7 +431,23 @@ class ReservationServiceTest {
     }
 
     private void assertErreur(int statutAttendu, Executable action) {
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, action);
-        assertEquals(statutAttendu, ex.getStatusCode().value());
+        Exception ex = assertThrows(Exception.class, action);
+
+        int statutReel;
+        if (ex instanceof ResponseStatusException responseStatusException) {
+            statutReel = responseStatusException.getStatusCode().value();
+        } else {
+            // The service also throws these project-specific business exceptions.
+            statutReel = switch (ex.getClass().getSimpleName()) {
+                case "ResourceNotFoundException" -> 404;
+                case "ValidationException" -> 400;
+                case "ReservationExpiredException" -> 409;
+                default -> throw new AssertionError(
+                        "Exception non prevue : " + ex.getClass().getName(), ex
+                );
+            };
+        }
+
+        assertEquals(statutAttendu, statutReel, ex.getMessage());
     }
 }
