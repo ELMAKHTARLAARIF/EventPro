@@ -1,13 +1,9 @@
-
 plugins {
     id 'java'
-    id 'war'
     id 'org.springframework.boot' version '4.1.1'
     id 'io.spring.dependency-management' version '1.1.7'
-    id 'com.netflix.dgs.codegen' version '8.3.0'
-    id 'org.graalvm.buildtools.native' version '1.1.8'
-    id 'jacoco'
-    id 'org.sonarqube' version '5.1.0.4882'
+    id 'jacoco'                                   // test coverage
+    id 'org.sonarqube' version '5.1.0.4882'       // SonarQube analysis
 }
 
 group = 'org.example'
@@ -18,116 +14,86 @@ java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(17)
     }
-
-    sourceCompatibility = JavaVersion.VERSION_17
 }
 
 repositories {
     mavenCentral()
 }
 
-ext {
-    set('springModulithVersion', "2.1.1")
-}
-
 dependencies {
-    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+    // ---------- application ----------
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
-    implementation 'org.springframework.modulith:spring-modulith-starter-core'
-
-    compileOnly 'org.projectlombok:lombok'
-    annotationProcessor 'org.projectlombok:lombok'
-
-    developmentOnly 'org.springframework.boot:spring-boot-devtools'
-    developmentOnly 'org.springframework.boot:spring-boot-docker-compose'
-
-    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
-
-    providedRuntime 'org.springframework.boot:spring-boot-starter-tomcat-runtime'
-
-    testImplementation 'org.springframework.boot:spring-boot-starter-thymeleaf-test'
-    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
-    testImplementation 'org.springframework.modulith:spring-modulith-starter-test'
-
-    testCompileOnly 'org.projectlombok:lombok'
-    testAnnotationProcessor 'org.projectlombok:lombok'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    runtimeOnly 'org.postgresql:postgresql'
-
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.security:spring-security-crypto'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2'
+    runtimeOnly 'org.postgresql:postgresql'
 
+    // QR code of the tickets (needed for the Ticket QR feature)
+    implementation 'com.google.zxing:core:3.5.3'
+    implementation 'com.google.zxing:javase:3.5.3'
+
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    // ---------- Lombok + MapStruct (order matters) ----------
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
     implementation 'org.mapstruct:mapstruct:1.6.3'
     annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
     annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
 
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2'
-
+    // ---------- tests ----------
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'   // JUnit 5 + Mockito + AssertJ
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testRuntimeOnly 'com.h2database:h2'
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+
+    // bonus: Testcontainers (concurrency test on the last place)
+    // testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    // testImplementation 'org.testcontainers:postgresql'
+    // testImplementation 'org.testcontainers:junit-jupiter'
 }
 
-dependencyManagement {
-    imports {
-        mavenBom "org.springframework.modulith:spring-modulith-bom:${springModulithVersion}"
-    }
-}
-
-generateJava {
-    schemaPaths = ["${projectDir}/src/main/resources/graphql-client"]
-    packageName = 'org.example.eventpro.codegen'
-    generateClient = true
-}
+// only one executable JAR in build/libs (the Dockerfile copies it)
+tasks.named('jar') { enabled = false }
 
 // ==================== TESTS ====================
-
 tasks.named('test') {
     useJUnitPlatform()
     finalizedBy tasks.named('jacocoTestReport')
 }
 
 // ==================== JACOCO ====================
+jacoco { toolVersion = '0.8.11' }
 
-jacoco {
-    toolVersion = '0.8.12'
+// classes that contain no business logic are not counted in the coverage
+def coverageExcludes = ['**/dto/**', '**/entity/**', '**/*MapperImpl*', '**/*Application*', '**/config/**']
+
+def filteredClasses = {
+    files(sourceSets.main.output.classesDirs.collect { fileTree(dir: it, exclude: coverageExcludes) })
 }
 
-def coverageExclusions = [
-        '**/entity/**',
-        '**/dto/**',
-        '**/config/**',
-        '**/codegen/**',
-        '**/*MapperImpl*',
-        '**/*Application.class'
-]
-
 tasks.named('jacocoTestReport') {
+    dependsOn tasks.named('test')
     reports {
-        xml.required = true
-        html.required = true
+        xml.required = true      // read by SonarQube
+        html.required = true     // published by Jenkins
     }
-
-    classDirectories.setFrom(
-            files(sourceSets.main.output.classesDirs.collect {
-                fileTree(dir: it, exclude: coverageExclusions)
-            })
-    )
+    classDirectories.setFrom(filteredClasses())
 }
 
 tasks.named('jacocoTestCoverageVerification') {
-    classDirectories.setFrom(
-            files(sourceSets.main.output.classesDirs.collect {
-                fileTree(dir: it, exclude: coverageExclusions)
-            })
-    )
-
+    dependsOn tasks.named('test')
+    classDirectories.setFrom(filteredClasses())
     violationRules {
         rule {
             limit {
                 counter = 'LINE'
                 value = 'COVEREDRATIO'
-                minimum = 0.80
+                minimum = 0.80          // build fails under 80 %
             }
         }
     }
@@ -135,4 +101,14 @@ tasks.named('jacocoTestCoverageVerification') {
 
 tasks.named('check') {
     dependsOn tasks.named('jacocoTestCoverageVerification')
+}
+
+// ==================== SONARQUBE ====================
+sonar {
+    properties {
+        property 'sonar.projectKey', 'eventpro-api'
+        property 'sonar.projectName', 'EventPro API'
+        property 'sonar.coverage.jacoco.xmlReportPaths', 'build/reports/jacoco/test/jacocoTestReport.xml'
+        property 'sonar.coverage.exclusions', '**/dto/**,**/entity/**,**/config/**,**/*Application*'
+    }
 }
