@@ -14,6 +14,5 @@ public record EventResponseDTO(
         LocalDateTime dateClotureVente,
         StatutEvenement statut,
         int capacite,
-        Long organisateurId,
-        String nomOrganisation
+        Long organisateurId
 ) {}

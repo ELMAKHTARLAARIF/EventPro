@@ -40,12 +40,4 @@ public class ReservationController {
 
         return ResponseEntity.ok(reservationService.update(id, dto));
     }
-
-
-    // Misse en Situation (reservationService -> reservationRepository )
-    @GetMapping("/api/v1/reservations/recherche")
-    public ResponseEntity<List<ReservationResponseDTO>> findClientsWithReservationConfirme(@PathVariable("evenementId") Long evenementId, @RequestParam StatutReservation statutReservation, String email,String nomCategorie,Long quantiteMin) {
-
-        return ResponseEntity.ok(reservationService.getClientWithReservationSConfirme(evenementId,statutReservation,email,nomCategorie,quantiteMin));
-    }
 }

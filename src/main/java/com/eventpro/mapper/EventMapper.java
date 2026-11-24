@@ -20,6 +20,7 @@ public interface EventMapper {
     @Mapping(target = "organisateur", ignore = true)
     @Mapping(target = "categories", ignore = true)
     @Mapping(target = "promotions", ignore = true)
+    @Mapping(target = "reservations", ignore = true)
     Evenement toEntity(EventRequestDTO dto);
 
     @Mapping(target = "id", ignore = true)
@@ -27,5 +28,6 @@ public interface EventMapper {
     @Mapping(target = "organisateur", ignore = true)
     @Mapping(target = "categories", ignore = true)
     @Mapping(target = "promotions", ignore = true)
+    @Mapping(target = "reservations", ignore = true)
     void updateEntity(EventRequestDTO dto, @MappingTarget Evenement evenement);
 }

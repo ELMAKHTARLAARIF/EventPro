@@ -3,7 +3,12 @@ pipeline {
 
     options {
         timestamps()
-        buildDiscarder(logRotator(numToKeepStr: '20'))   // keep the last 20 builds
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+    }
+
+    environment {
+        IMAGE_NAME = 'elmakhtarlaarif/eventpro'   // must be lowercase: <dockerhub-username>/<image>
+        IMAGE_TAG  = "${env.BUILD_NUMBER}"
     }
 
     stages {
@@ -20,34 +25,61 @@ pipeline {
         }
 
         stage('Tests') {
-            steps {
-                // JUnit 5 + Mockito, JaCoCo report is generated right after
-                sh './gradlew test jacocoTestReport --no-daemon'
-            }
+            steps { sh './gradlew test jacocoTestReport --no-daemon' }
         }
 
         stage('Coverage >= 80%') {
+            steps { sh './gradlew jacocoTestCoverageVerification --no-daemon' }
+        }
+
+        stage('SonarQube Analysis') {
             steps {
-                sh './gradlew jacocoTestCoverageVerification --no-daemon'
+                withSonarQubeEnv('sonarqube') {
+                    sh './gradlew sonar --no-daemon'
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
             }
         }
 
         stage('Package') {
+            steps { sh './gradlew bootJar -x test --no-daemon' }
+        }
+
+        stage('Docker Build & Push') {
             steps {
-                sh './gradlew bootJar -x test --no-daemon'
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds',
+                                                  usernameVariable: 'DH_USER',
+                                                  passwordVariable: 'DH_PASS')]) {
+                    sh '''
+                        docker build -t $IMAGE_NAME:$IMAGE_TAG -t $IMAGE_NAME:latest .
+                        echo "$DH_PASS" | docker login -u "$DH_USER" --password-stdin
+                        docker push $IMAGE_NAME:$IMAGE_TAG
+                        docker push $IMAGE_NAME:latest
+                        docker logout
+                    '''
+                }
             }
         }
     }
 
     post {
         always {
-            // JUnit results (tab "Test Result" on the build page)
             junit allowEmptyResults: true, testResults: 'build/test-results/test/*.xml'
-            // JaCoCo reports + the JAR are kept with the build
             archiveArtifacts artifacts: 'build/reports/jacoco/test/**', allowEmptyArchive: true
             archiveArtifacts artifacts: 'build/libs/*.jar', allowEmptyArchive: true, fingerprint: true
         }
-        success { echo 'Pipeline OK' }
-        failure { echo 'Pipeline FAILED: see the stage in red' }
+        success {
+            echo "Pipeline OK, image ${IMAGE_NAME}:${IMAGE_TAG} pushed"
+        }
+        failure {
+            echo 'Pipeline FAILED: see the stage in red'
+        }
     }
 }
