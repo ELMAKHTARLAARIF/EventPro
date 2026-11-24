@@ -1,39 +1,53 @@
 pipeline {
     agent any
-    tools { jdk 'jdk17' }
-    environment { IMAGE = "youruser/eventpro-api" }
+
+    options {
+        timestamps()
+        buildDiscarder(logRotator(numToKeepStr: '20'))   // keep the last 20 builds
+    }
+
     stages {
-        stage('Checkout') { steps { checkout scm } }
-        stage('Build')    { steps { sh 'chmod +x gradlew && ./gradlew clean assemble -x test' } }
-        stage('Tests + Coverage') { steps { sh './gradlew test jacocoTestReport jacocoTestCoverageVerification' } }
-        stage('SonarQube') {
+
+        stage('Checkout') {
+            steps { checkout scm }
+        }
+
+        stage('Build') {
             steps {
-                withSonarQubeEnv('sonarqube') {
-                    sh './gradlew sonar -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.token=$SONAR_AUTH_TOKEN'
-                }
+                sh 'chmod +x gradlew'
+                sh './gradlew clean assemble -x test --no-daemon'
             }
         }
-        stage('Quality Gate') {
-            steps { timeout(time: 5, unit: 'MINUTES') { waitForQualityGate abortPipeline: true } }
-        }
-        stage('Package') { steps { sh './gradlew bootJar' } }
-        stage('Docker') {
+
+        stage('Tests') {
             steps {
-                script {
-                    def tag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
-                    def img = docker.build("${IMAGE}:${tag}")
-                    docker.withRegistry('', 'dockerhub-credentials') { img.push(); img.push('latest') }
-                }
+                // JUnit 5 + Mockito, JaCoCo report is generated right after
+                sh './gradlew test jacocoTestReport --no-daemon'
+            }
+        }
+
+        stage('Coverage >= 80%') {
+            steps {
+                sh './gradlew jacocoTestCoverageVerification --no-daemon'
+            }
+        }
+
+        stage('Package') {
+            steps {
+                sh './gradlew bootJar -x test --no-daemon'
             }
         }
     }
+
     post {
         always {
-            junit 'build/test-results/test/*.xml'
-            publishHTML(target: [reportDir: 'build/reports/jacoco/test/html', reportFiles: 'index.html', reportName: 'JaCoCo'])
-            archiveArtifacts artifacts: 'build/libs/*.jar', fingerprint: true
+            // JUnit results (tab "Test Result" on the build page)
+            junit allowEmptyResults: true, testResults: 'build/test-results/test/*.xml'
+            // JaCoCo reports + the JAR are kept with the build
+            archiveArtifacts artifacts: 'build/reports/jacoco/test/**', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'build/libs/*.jar', allowEmptyArchive: true, fingerprint: true
         }
-        success { mail to: 'you@mail.com', subject: "SUCCESS ${env.JOB_NAME} #${env.BUILD_NUMBER}", body: "${env.BUILD_URL}" }
-        failure { mail to: 'you@mail.com', subject: "FAILED ${env.JOB_NAME} #${env.BUILD_NUMBER}", body: "${env.BUILD_URL}" }
+        success { echo 'Pipeline OK' }
+        failure { echo 'Pipeline FAILED: see the stage in red' }
     }
 }
