@@ -1,4 +1,4 @@
-package com.eventpro.dto.Remboursement;
+package com.eventpro.dto.remboursement;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

@@ -1,7 +1,7 @@
 package com.eventpro.service;
 
 import com.eventpro.dto.CheckInResponseDTO;
-import com.eventpro.dto.egentController.CheckInRequestDTO;
+import com.eventpro.dto.egent.CheckInRequestDTO;
 import com.eventpro.entity.AgentControle;
 import com.eventpro.entity.Billet;
 import com.eventpro.entity.Evenement;

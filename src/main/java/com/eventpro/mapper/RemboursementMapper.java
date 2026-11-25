@@ -1,6 +1,6 @@
 package com.eventpro.mapper;
 
-import com.eventpro.dto.Remboursement.RemboursementResponseDTO;
+import com.eventpro.dto.remboursement.RemboursementResponseDTO;
 import com.eventpro.entity.Remboursement;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

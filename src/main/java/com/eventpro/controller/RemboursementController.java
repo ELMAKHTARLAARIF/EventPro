@@ -1,7 +1,7 @@
 package com.eventpro.controller;
 
-import com.eventpro.dto.Remboursement.RemboursementRequestDTO;
-import com.eventpro.dto.Remboursement.RemboursementResponseDTO;
+import com.eventpro.dto.remboursement.RemboursementRequestDTO;
+import com.eventpro.dto.remboursement.RemboursementResponseDTO;
 import com.eventpro.service.RemboursementService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;

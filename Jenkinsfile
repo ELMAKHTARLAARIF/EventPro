@@ -3,7 +3,7 @@ pipeline {
 
     options {
         timestamps()
-        buildDiscarder(logRotator(numToKeepStr: '20'))
+        buildDiscarder(logRotator(numToKeepStr: '10'))
     }
 
     environment {
@@ -12,26 +12,26 @@ pipeline {
     }
 
     stages {
-
+//Download source code
         stage('Checkout') {
             steps { checkout scm }
         }
-
+//Compile the application
         stage('Build') {
             steps {
                 sh 'chmod +x gradlew'
                 sh './gradlew clean assemble -x test --no-daemon'
             }
         }
-
+// Execute unit tests
         stage('Tests') {
             steps { sh './gradlew test jacocoTestReport --no-daemon' }
         }
-
+// Verify minimum 80% coverage
         stage('Coverage >= 80%') {
             steps { sh './gradlew jacocoTestCoverageVerification --no-daemon' }
         }
-
+//Analyze code quality
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('sonarqube') {
@@ -47,11 +47,11 @@ pipeline {
                 }
             }
         }
-
+//Generate executable JAR
         stage('Package') {
             steps { sh './gradlew bootJar -x test --no-daemon' }
         }
-
+//Build and upload Docker image
         stage('Docker Build & Push') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-creds',

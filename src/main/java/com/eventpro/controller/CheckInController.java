@@ -1,7 +1,7 @@
 package com.eventpro.controller;
 
 import com.eventpro.dto.CheckInResponseDTO;
-import com.eventpro.dto.egentController.CheckInRequestDTO;
+import com.eventpro.dto.egent.CheckInRequestDTO;
 import com.eventpro.enums.ResultatControle;
 import com.eventpro.service.CheckInService;
 import jakarta.validation.Valid;

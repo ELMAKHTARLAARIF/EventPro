@@ -1,4 +1,4 @@
-package com.eventpro.dto.egentController;
+package com.eventpro.dto.egent;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

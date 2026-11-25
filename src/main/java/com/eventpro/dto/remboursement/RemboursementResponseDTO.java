@@ -1,4 +1,4 @@
-package com.eventpro.dto.Remboursement;
+package com.eventpro.dto.remboursement;
 
 import com.eventpro.enums.StatutRemboursement;
 import com.eventpro.enums.StatutReservation;

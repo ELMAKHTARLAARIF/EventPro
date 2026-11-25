@@ -1,7 +1,7 @@
 package com.eventpro.service;
 
-import com.eventpro.dto.Remboursement.RemboursementRequestDTO;
-import com.eventpro.dto.Remboursement.RemboursementResponseDTO;
+import com.eventpro.dto.remboursement.RemboursementRequestDTO;
+import com.eventpro.dto.remboursement.RemboursementResponseDTO;
 import com.eventpro.entity.*;
 import com.eventpro.enums.StatutPaiement;
 import com.eventpro.enums.StatutReservation;

@@ -3,7 +3,6 @@ package com.eventpro.controller;
 import com.eventpro.dto.reservation.ReservationRequestDTO;
 import com.eventpro.dto.reservation.ReservationResponseDTO;
 import com.eventpro.dto.reservation.ReservationUpdateDTO;
-import com.eventpro.enums.StatutReservation;
 import com.eventpro.service.ReservationService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
