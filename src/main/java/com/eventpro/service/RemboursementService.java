@@ -5,7 +5,6 @@ import com.eventpro.dto.remboursement.RemboursementResponseDTO;
 import com.eventpro.entity.*;
 import com.eventpro.enums.StatutPaiement;
 import com.eventpro.enums.StatutReservation;
-// EXCEPTION: our custom business exception (handled by GlobalExceptionHandler)
 import com.eventpro.exception.ResourceNotFoundException;
 import com.eventpro.mapper.RemboursementMapper;
 import com.eventpro.repository.RemboursementRepository;

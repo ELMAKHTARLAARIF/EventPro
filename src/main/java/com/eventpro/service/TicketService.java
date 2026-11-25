@@ -5,7 +5,6 @@ import com.eventpro.entity.Billet;
 import com.eventpro.entity.LigneReservation;
 import com.eventpro.entity.Reservation;
 import com.eventpro.enums.StatutBillet;
-// EXCEPTION: our custom business exception (handled by GlobalExceptionHandler)
 import com.eventpro.exception.ResourceNotFoundException;
 import com.eventpro.mapper.TicketMapper;
 import com.eventpro.repository.BilletRepository;

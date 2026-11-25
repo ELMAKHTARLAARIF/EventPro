@@ -7,9 +7,6 @@ import com.eventpro.dto.reservation.ReservationUpdateDTO;
 import com.eventpro.entity.*;
 import com.eventpro.enums.StatutEvenement;
 import com.eventpro.enums.StatutReservation;
-// EXCEPTION: our custom business exceptions (see the exception package). They replace ResponseStatusException
-// when the cahier des charges has a dedicated exception for the situation.
-import com.eventpro.exception.AucuneReservationTrouveeException;
 import com.eventpro.exception.ReservationExpiredException;
 import com.eventpro.exception.ResourceNotFoundException;
 import com.eventpro.exception.ValidationException;
